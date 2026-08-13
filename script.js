@@ -1,572 +1,258 @@
-(() => {
+/* =========================================================
+   SENTRA / SYSTEM ENGINE
+========================================================= */
 
-  "use strict";
+document.addEventListener("DOMContentLoaded", () => {
 
+  const loader = document.getElementById("loader");
+  const loaderStatus = document.getElementById("loaderStatus");
+  const loaderProgress = document.getElementById("loaderProgress");
+  const loaderPercent = document.getElementById("loaderPercent");
+  const loaderCode = document.getElementById("loaderCode");
 
-  /* =========================================================
-     ELEMENTS
-  ========================================================== */
+  const system = document.getElementById("system");
+  const stage = document.getElementById("horizontalStage");
+  const track = document.getElementById("horizontalTrack");
 
-  const body =
-    document.body;
+  const sceneNumber = document.getElementById("sceneNumber");
+  const globalStatus = document.getElementById("globalStatus");
+  const progressPercent = document.getElementById("progressPercent");
+  const progressFill = document.getElementById("progressFill");
+  const progressNode = document.getElementById("progressNode");
+  const mobilePosition = document.getElementById("mobilePosition");
 
-  const loader =
-    document.getElementById(
-      "loader"
-    );
+  const scenes = [...document.querySelectorAll(".scene")];
+  const navItems = [...document.querySelectorAll(".nav-item")];
 
-  const loaderStatus =
-    document.getElementById(
-      "loaderStatus"
-    );
+  const menuButton = document.getElementById("menuButton");
+  const systemNav = document.getElementById("systemNav");
+  const navClose = document.getElementById("navClose");
 
-  const loaderPercent =
-    document.getElementById(
-      "loaderPercent"
-    );
+  const floatingRequest = document.getElementById("floatingRequest");
+  const contactTrigger = document.getElementById("contactTrigger");
 
-  const loaderProgress =
-    document.getElementById(
-      "loaderProgress"
-    );
+  const modal = document.getElementById("projectModal");
+  const modalClose = document.getElementById("modalClose");
+  const modalBackdrop = document.querySelector(".modal-backdrop");
 
-  const horizontalWorld =
-    document.getElementById(
-      "horizontalWorld"
-    );
-
-  const horizontalTrack =
-    document.getElementById(
-      "horizontalTrack"
-    );
-
-  const scenes =
-    [...document.querySelectorAll(
-      ".scene"
-    )];
-
-  const sceneIndex =
-    document.getElementById(
-      "sceneIndex"
-    );
-
-  const sceneProgress =
-    document.getElementById(
-      "sceneProgress"
-    );
-
-  const systemTime =
-    document.getElementById(
-      "systemTime"
-    );
-
-  const cursor =
-    document.getElementById(
-      "cursor"
-    );
-
-  const cursorLabel =
-    document.getElementById(
-      "cursorLabel"
-    );
-
-  const requestOverlay =
-    document.getElementById(
-      "requestOverlay"
-    );
-
-  const requestModal =
-    document.querySelector(
-      ".request-modal"
-    );
-
-  const openRequest =
-    document.getElementById(
-      "openRequest"
-    );
-
-  const closeRequest =
-    document.getElementById(
-      "closeRequest"
-    );
-
-  const requestForm =
-    document.getElementById(
-      "requestForm"
-    );
+  const projectForm = document.getElementById("projectForm");
+  const formSuccess = document.getElementById("formSuccess");
 
 
-  /* =========================================================
-     STATE
-  ========================================================== */
-
-  let mobile =
-    window.innerWidth <= 900;
-
-  let targetProgress = 0;
-
-  let currentProgress = 0;
-
-  let currentScene = 0;
-
-  let lastScroll =
-    window.scrollY;
-
-  let animationFrame = null;
-
-
-  /* =========================================================
-     UTILITY
-  ========================================================== */
-
-  const clamp =
-    (value, min, max) =>
-      Math.min(
-        Math.max(
-          value,
-          min
-        ),
-        max
-      );
-
-
-  const lerp =
-    (a, b, amount) =>
-      a + (b - a) * amount;
-
-
-  const wait =
-    ms =>
-      new Promise(
-        resolve =>
-          setTimeout(
-            resolve,
-            ms
-          )
-      );
-
-
-  /* =========================================================
-     CLOCK
-  ========================================================== */
-
-  function updateClock() {
-
-    const now =
-      new Date();
-
-    const h =
-      String(
-        now.getHours()
-      ).padStart(2, "0");
-
-    const m =
-      String(
-        now.getMinutes()
-      ).padStart(2, "0");
-
-    const s =
-      String(
-        now.getSeconds()
-      ).padStart(2, "0");
-
-    systemTime.textContent =
-      `${h}:${m}:${s}`;
-  }
-
-
-  updateClock();
-
-  setInterval(
-    updateClock,
-    1000
-  );
-
-
-  /* =========================================================
+  /* =======================================================
      LOADER
-  ========================================================== */
+  ======================================================== */
 
-  const loaderStates = [
-
+  const loaderSteps = [
     {
-      value: 8,
-      text:
-        "SYSTEM INITIALIZATION"
+      text: "SYSTEM INITIALIZATION",
+      code: "NODE 00"
     },
-
     {
-      value: 26,
-      text:
-        "CENTRAL NODE ACTIVE"
+      text: "NETWORK CONNECTED",
+      code: "NODE 04"
     },
-
     {
-      value: 47,
-      text:
-        "NETWORK CONNECTED"
+      text: "OBJECT DETECTED",
+      code: "OBJECT 01"
     },
-
     {
-      value: 71,
-      text:
-        "OBJECT DETECTED"
-    },
-
-    {
-      value: 88,
-      text:
-        "CONTROL NETWORK ACTIVE"
-    },
-
-    {
-      value: 100,
-      text:
-        "SYSTEM ONLINE"
+      text: "SYSTEM ONLINE",
+      code: "SENTRA / ACTIVE"
     }
-
   ];
 
+  let loaderStart = performance.now();
 
-  async function animateLoader(
-    from,
-    to
-  ) {
+  function runLoader(now) {
 
-    const duration = 600;
+    const elapsed = now - loaderStart;
+    const duration = 4300;
+    const progress = Math.min(elapsed / duration, 1);
 
-    const start =
-      performance.now();
+    const percent = Math.floor(progress * 100);
 
-    return new Promise(
-      resolve => {
+    loaderProgress.style.width = `${percent}%`;
+    loaderPercent.textContent = String(percent).padStart(2, "0");
 
-        function frame(
-          timestamp
-        ) {
+    let step;
 
-          const progress =
-            clamp(
-              (
-                timestamp -
-                start
-              ) / duration,
-              0,
-              1
-            );
-
-          const value =
-            Math.round(
-              from +
-              (
-                to - from
-              ) *
-              progress
-            );
-
-          loaderPercent.textContent =
-            `${String(value).padStart(2, "0")}%`;
-
-          loaderProgress.style.width =
-            `${value}%`;
-
-          if (
-            progress < 1
-          ) {
-
-            requestAnimationFrame(
-              frame
-            );
-
-          } else {
-
-            resolve();
-
-          }
-
-        }
-
-        requestAnimationFrame(
-          frame
-        );
-
-      }
-    );
-  }
-
-
-  async function startLoader() {
-
-    body.classList.add(
-      "is-loading"
-    );
-
-    let previous = 0;
-
-    await wait(450);
-
-
-    for (
-      const state
-      of loaderStates
-    ) {
-
-      loaderStatus.textContent =
-        state.text;
-
-      await animateLoader(
-        previous,
-        state.value
-      );
-
-      previous =
-        state.value;
-
-      await wait(260);
-
+    if (progress < .27) {
+      step = loaderSteps[0];
+    } else if (progress < .53) {
+      step = loaderSteps[1];
+    } else if (progress < .78) {
+      step = loaderSteps[2];
+    } else {
+      step = loaderSteps[3];
     }
 
+    loaderStatus.textContent = step.text;
+    loaderCode.textContent = step.code;
 
-    await wait(850);
-
-    loader.classList.add(
-      "is-hidden"
-    );
-
-    body.classList.remove(
-      "is-loading"
-    );
-
-
-    setTimeout(
-      () => {
-
-        if (!mobile) {
-          initializeHorizontal();
-        }
-
-      },
-      300
-    );
-
+    if (progress < 1) {
+      requestAnimationFrame(runLoader);
+    } else {
+      setTimeout(() => {
+        loader.classList.add("is-done");
+        system.classList.add("ready");
+        document.body.classList.add("system-ready");
+      }, 650);
+    }
   }
 
+  requestAnimationFrame(runLoader);
 
-  /* =========================================================
-     HORIZONTAL SCROLL
-  ========================================================== */
 
-  function getMaxScroll() {
+  /* =======================================================
+     STATE
+  ======================================================== */
 
+  let currentProgress = 0;
+  let targetProgress = 0;
+  let currentScene = 0;
+  let raf = null;
+
+  function maxScroll() {
     return Math.max(
-      document.documentElement
-        .scrollHeight -
-      window.innerHeight,
-      1
+      0,
+      stage.offsetHeight - window.innerHeight
     );
-
   }
 
+  function getProgressFromScroll() {
+    const max = maxScroll();
 
-  function getHorizontalDistance() {
-
-    return Math.max(
-      horizontalTrack.scrollWidth -
-      window.innerWidth,
-      0
-    );
-
-  }
-
-
-  function updateTargetFromScroll() {
-
-    if (mobile) {
-      return;
+    if (!max) {
+      return 0;
     }
 
-    const max =
-      getMaxScroll();
-
-    targetProgress =
-      clamp(
-        window.scrollY /
-        max,
+    return Math.min(
+      1,
+      Math.max(
         0,
-        1
-      );
-
+        window.scrollY / max
+      )
+    );
   }
 
 
-  function renderHorizontal() {
+  /* =======================================================
+     TRACK
+  ======================================================== */
 
-    if (mobile) {
+  function render() {
 
-      horizontalTrack.style.transform =
-        "none";
+    currentProgress +=
+      (targetProgress - currentProgress) * .11;
 
-      return;
-
-    }
-
-
-    const distance =
-      getHorizontalDistance();
+    const travel =
+      window.innerWidth * 7;
 
     const x =
-      distance *
-      currentProgress;
+      currentProgress * travel;
 
+    track.style.transform =
+      `translate3d(${-x}px, 0, 0)`;
 
-    horizontalTrack.style.transform =
-      `translate3d(${-x}px,0,0)`;
+    updateInterface(currentProgress);
 
+    raf = requestAnimationFrame(render);
   }
 
-
-  function animateHorizontal() {
-
-    currentProgress =
-      lerp(
-        currentProgress,
-        targetProgress,
-        .075
-      );
+  raf = requestAnimationFrame(render);
 
 
-    renderHorizontal();
+  /* =======================================================
+     TARGET SCROLL
+  ======================================================== */
 
+  function setTargetProgress(value) {
 
-    const scenePosition =
-      currentProgress *
-      (
-        scenes.length - 1
-      );
-
-
-    updateScene(
-      scenePosition
-    );
-
-
-    animationFrame =
-      requestAnimationFrame(
-        animateHorizontal
-      );
-
-  }
-
-
-  function initializeHorizontal() {
-
-    if (mobile) {
-      return;
-    }
-
-
-    updateTargetFromScroll();
-
-    currentProgress =
-      targetProgress;
-
-    renderHorizontal();
-
-    updateScene(
-      currentProgress *
-      (
-        scenes.length - 1
+    targetProgress = Math.min(
+      1,
+      Math.max(
+        0,
+        value
       )
     );
 
+    const scrollPosition =
+      targetProgress * maxScroll();
 
-    if (
-      !animationFrame
-    ) {
-
-      animationFrame =
-        requestAnimationFrame(
-          animateHorizontal
-        );
-
-    }
-
+    window.scrollTo({
+      top: scrollPosition,
+      behavior: "auto"
+    });
   }
 
 
-  window.addEventListener(
-    "scroll",
-    () => {
+  function moveByDelta(delta) {
 
-      if (mobile) {
-        return;
-      }
+    const max = maxScroll();
 
-      updateTargetFromScroll();
-
-      lastScroll =
-        window.scrollY;
-
-    },
-    {
-      passive: true
+    if (!max) {
+      return;
     }
-  );
+
+    const sensitivity =
+      window.innerWidth <= 900
+        ? 0.00115
+        : 0.00075;
+
+    targetProgress +=
+      delta * sensitivity;
+
+    targetProgress = Math.min(
+      1,
+      Math.max(
+        0,
+        targetProgress
+      )
+    );
+
+    window.scrollTo({
+      top: targetProgress * max,
+      behavior: "auto"
+    });
+  }
 
 
-  /* =========================================================
+  /* =======================================================
      WHEEL
-  ========================================================== */
+  ======================================================== */
+
+  let wheelLocked = false;
 
   window.addEventListener(
     "wheel",
-    event => {
+    (event) => {
 
       if (
-        mobile ||
-        body.classList.contains(
-          "is-loading"
-        ) ||
-        requestOverlay.classList.contains(
-          "is-open"
-        )
+        modal.classList.contains("open") ||
+        systemNav.classList.contains("open")
       ) {
         return;
       }
 
-
       event.preventDefault();
 
+      if (wheelLocked) {
+        return;
+      }
+
+      wheelLocked = true;
 
       const delta =
-        Math.abs(
-          event.deltaY
-        ) >
-        Math.abs(
-          event.deltaX
-        )
+        Math.abs(event.deltaY) > Math.abs(event.deltaX)
           ? event.deltaY
           : event.deltaX;
 
+      moveByDelta(delta);
 
-      const max =
-        getMaxScroll();
-
-
-      const next =
-        clamp(
-          window.scrollY +
-          delta *
-          1.35,
-          0,
-          max
-        );
-
-
-      window.scrollTo({
-        top: next,
-        behavior: "auto"
-      });
+      setTimeout(() => {
+        wheelLocked = false;
+      }, 8);
 
     },
     {
@@ -575,656 +261,489 @@
   );
 
 
-  /* =========================================================
-     KEYBOARD
-  ========================================================== */
+  /* =======================================================
+     NORMAL SCROLL
+  ======================================================== */
+
+  let scrollTimer = null;
 
   window.addEventListener(
-    "keydown",
-    event => {
+    "scroll",
+    () => {
 
-      if (
-        mobile ||
-        requestOverlay.classList.contains(
-          "is-open"
-        )
-      ) {
-        return;
+      if (scrollTimer) {
+        clearTimeout(scrollTimer);
       }
 
+      scrollTimer = setTimeout(() => {
 
-      const step =
-        1 /
-        (
-          scenes.length - 1
-        );
+        const p = getProgressFromScroll();
 
+        targetProgress = p;
 
-      if (
-        event.key ===
-        "ArrowRight"
-      ) {
+      }, 5);
 
-        event.preventDefault();
-
-        moveTo(
-          targetProgress +
-          step
-        );
-
-      }
-
-
-      if (
-        event.key ===
-        "ArrowLeft"
-      ) {
-
-        event.preventDefault();
-
-        moveTo(
-          targetProgress -
-          step
-        );
-
-      }
-
-
-      if (
-        event.key ===
-        "PageDown"
-      ) {
-
-        event.preventDefault();
-
-        moveTo(
-          targetProgress +
-          step
-        );
-
-      }
-
-
-      if (
-        event.key ===
-        "PageUp"
-      ) {
-
-        event.preventDefault();
-
-        moveTo(
-          targetProgress -
-          step
-        );
-
-      }
-
-
-      if (
-        event.key ===
-        "Home"
-      ) {
-
-        event.preventDefault();
-
-        moveTo(0);
-
-      }
-
-
-      if (
-        event.key ===
-        "End"
-      ) {
-
-        event.preventDefault();
-
-        moveTo(1);
-
-      }
-
+    },
+    {
+      passive: true
     }
   );
 
 
-  function moveTo(
-    progress
-  ) {
-
-    const max =
-      getMaxScroll();
-
-    const value =
-      clamp(
-        progress,
-        0,
-        1
-      );
-
-
-    window.scrollTo({
-      top:
-        value *
-        max,
-
-      behavior:
-        "smooth"
-    });
-
-  }
-
-
-  /* =========================================================
-     SCENE UPDATE
-  ========================================================== */
-
-  function updateScene(
-    scenePosition
-  ) {
-
-    const index =
-      Math.round(
-        scenePosition
-      );
-
-
-    if (
-      index !== currentScene
-    ) {
-
-      currentScene =
-        index;
-
-      activateScene(
-        index
-      );
-
-    }
-
-
-    sceneIndex.textContent =
-      String(
-        index + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-
-    sceneProgress.style.height =
-      `${(
-        (
-          scenePosition + 1
-        ) /
-        scenes.length
-      ) * 100}%`;
-
-  }
-
-
-  function activateScene(
-    index
-  ) {
-
-    scenes.forEach(
-      (
-        scene,
-        sceneIndexValue
-      ) => {
-
-        scene.classList.toggle(
-          "active",
-          sceneIndexValue ===
-          index
-        );
-
-      }
-    );
-
-
-    if (
-      index === 2
-    ) {
-
-      playAccess();
-
-    }
-
-
-    if (
-      index === 3
-    ) {
-
-      playSecurity();
-
-    }
-
-  }
-
-
-  /* =========================================================
-     ACCESS SEQUENCE
-  ========================================================== */
-
-  let accessInterval = null;
-
-
-  function playAccess() {
-
-    clearInterval(
-      accessInterval
-    );
-
-
-    const sequence =
-      [
-        ...document.querySelectorAll(
-          ".sequence-item"
-        )
-      ];
-
-
-    sequence.forEach(
-      item =>
-        item.classList.remove(
-          "active"
-        )
-    );
-
-
-    let index = 0;
-
-
-    accessInterval =
-      setInterval(
-        () => {
-
-          sequence.forEach(
-            (
-              item,
-              itemIndex
-            ) => {
-
-              item.classList.toggle(
-                "active",
-                itemIndex <= index
-              );
-
-            }
-          );
-
-
-          index++;
-
-
-          if (
-            index >=
-            sequence.length
-          ) {
-
-            clearInterval(
-              accessInterval
-            );
-
-            setTimeout(
-              () => {
-
-                if (
-                  currentScene === 2
-                ) {
-
-                  playAccess();
-
-                }
-
-              },
-              1500
-            );
-
-          }
-
-        },
-        600
-      );
-
-  }
-
-
-  /* =========================================================
-     SECURITY SEQUENCE
-  ========================================================== */
-
-  let securityInterval = null;
-
-
-  function playSecurity() {
-
-    clearInterval(
-      securityInterval
-    );
-
-
-    const states =
-      [
-        ...document.querySelectorAll(
-          ".console-state"
-        )
-      ];
-
-
-    states.forEach(
-      state => {
-
-        state.style.opacity =
-          ".25";
-
-        state.style.color =
-          "";
-
-      }
-    );
-
-
-    let index = 0;
-
-
-    securityInterval =
-      setInterval(
-        () => {
-
-          states.forEach(
-            (
-              state,
-              stateIndex
-            ) => {
-
-              state.style.opacity =
-                stateIndex === index
-                  ? "1"
-                  : ".25";
-
-
-              state.style.color =
-                stateIndex === index
-                  ? "var(--gold)"
-                  : "";
-
-            }
-          );
-
-
-          index++;
-
-
-          if (
-            index >=
-            states.length
-          ) {
-
-            clearInterval(
-              securityInterval
-            );
-
-
-            setTimeout(
-              () => {
-
-                if (
-                  currentScene === 3
-                ) {
-
-                  playSecurity();
-
-                }
-
-              },
-              1700
-            );
-
-          }
-
-        },
-        850
-      );
-
-  }
-
-
-  /* =========================================================
-     IMAGE PARALLAX
-  ========================================================== */
+  /* =======================================================
+     TOUCH
+  ======================================================== */
+
+  let touchStartY = 0;
+  let touchLastY = 0;
 
   window.addEventListener(
-    "mousemove",
-    event => {
+    "touchstart",
+    (event) => {
 
       if (
-        mobile ||
-        body.classList.contains(
-          "is-loading"
-        )
+        modal.classList.contains("open") ||
+        systemNav.classList.contains("open")
       ) {
         return;
       }
 
+      touchStartY =
+        event.touches[0].clientY;
 
-      const x =
-        (
-          event.clientX /
-          window.innerWidth
-        ) -
-        .5;
+      touchLastY =
+        touchStartY;
 
+    },
+    {
+      passive: true
+    }
+  );
+
+
+  window.addEventListener(
+    "touchmove",
+    (event) => {
+
+      if (
+        modal.classList.contains("open") ||
+        systemNav.classList.contains("open")
+      ) {
+        return;
+      }
 
       const y =
-        (
-          event.clientY /
-          window.innerHeight
-        ) -
-        .5;
+        event.touches[0].clientY;
 
+      const delta =
+        touchLastY - y;
 
-      document
-        .querySelectorAll(
-          ".scene-image img"
-        )
-        .forEach(
-          img => {
+      touchLastY = y;
 
-            img.style.setProperty(
-              "--px",
-              `${x * -12}px`
-            );
+      moveByDelta(delta * 1.35);
 
-            img.style.setProperty(
-              "--py",
-              `${y * -8}px`
-            );
-
-          }
-        );
-
+    },
+    {
+      passive: true
     }
   );
 
 
-  /* =========================================================
-     CURSOR
-  ========================================================== */
+  /* =======================================================
+     POINTER DRAG
+  ======================================================== */
 
-  let mouseX = 0;
-  let mouseY = 0;
+  let dragging = false;
+  let pointerX = 0;
 
-  let cursorX = 0;
-  let cursorY = 0;
+  window.addEventListener(
+    "pointerdown",
+    (event) => {
+
+      if (
+        event.pointerType !== "mouse" ||
+        event.button !== 0
+      ) {
+        return;
+      }
+
+      if (
+        modal.classList.contains("open") ||
+        systemNav.classList.contains("open")
+      ) {
+        return;
+      }
+
+      dragging = true;
+      pointerX = event.clientX;
+
+      document.body.classList.add("dragging");
+
+    }
+  );
 
 
   window.addEventListener(
-    "mousemove",
-    event => {
+    "pointermove",
+    (event) => {
 
-      mouseX =
-        event.clientX;
+      if (!dragging) {
+        return;
+      }
 
-      mouseY =
-        event.clientY;
+      const delta =
+        pointerX - event.clientX;
+
+      pointerX = event.clientX;
+
+      moveByDelta(delta * 1.5);
 
     }
   );
 
 
-  function animateCursor() {
+  window.addEventListener(
+    "pointerup",
+    () => {
 
-    cursorX =
-      lerp(
-        cursorX,
-        mouseX,
-        .18
-      );
+      dragging = false;
 
+      document.body.classList.remove("dragging");
 
-    cursorY =
-      lerp(
-        cursorY,
-        mouseY,
-        .18
-      );
+    }
+  );
 
 
-    cursor.style.left =
-      `${cursorX}px`;
+  /* =======================================================
+     INTERFACE UPDATE
+  ======================================================== */
 
-    cursor.style.top =
-      `${cursorY}px`;
+  function updateInterface(progress) {
 
+    const sceneFloat =
+      progress * scenes.length;
 
-    cursorLabel.style.left =
-      `${cursorX}px`;
+    let index =
+      Math.floor(sceneFloat);
 
-    cursorLabel.style.top =
-      `${cursorY}px`;
+    if (index >= scenes.length) {
+      index = scenes.length - 1;
+    }
 
+    const local =
+      sceneFloat - index;
 
-    requestAnimationFrame(
-      animateCursor
+    if (index !== currentScene) {
+      currentScene = index;
+      updateSceneState(index);
+    }
+
+    const percent =
+      Math.round(progress * 100);
+
+    progressPercent.textContent =
+      `${String(percent).padStart(2, "0")}%`;
+
+    progressFill.style.width =
+      `${percent}%`;
+
+    progressNode.style.left =
+      `${percent}%`;
+
+    sceneNumber.textContent =
+      String(index + 1).padStart(2, "0");
+
+    updateSceneMotion(
+      index,
+      local
     );
-
   }
 
 
-  animateCursor();
+  /* =======================================================
+     SCENE STATE
+  ======================================================== */
+
+  const sceneNames = [
+    "OBJECT DETECTED",
+    "SURVEILLANCE ACTIVE",
+    "ACCESS CONTROL",
+    "RESPONSE READY",
+    "SYSTEM HEALTH",
+    "NETWORK ACTIVE",
+    "CENTRAL NODE",
+    "NEW OBJECT"
+  ];
+
+  const globalNames = [
+    "OBJECT ONLINE",
+    "SURVEILLANCE ACTIVE",
+    "ACCESS VERIFIED",
+    "RESPONSE READY",
+    "SERVICE ACTIVE",
+    "NETWORK ACTIVE",
+    "CONTROL CENTER",
+    "CHANNEL READY"
+  ];
 
 
-  document.addEventListener(
-    "mouseover",
-    event => {
+  function updateSceneState(index) {
 
-      const interactive =
-        event.target.closest(
-          "button, a, input, textarea"
-        );
+    scenes.forEach((scene, i) => {
+      scene.classList.toggle(
+        "active",
+        i === index
+      );
+    });
+
+    navItems.forEach((item, i) => {
+      item.classList.toggle(
+        "active",
+        i === index
+      );
+    });
+
+    globalStatus.textContent =
+      globalNames[index];
+
+    mobilePosition.textContent =
+      sceneNames[index];
+
+    if (index === 0) {
+      document.getElementById("objectState").textContent =
+        "ONLINE";
+    }
+
+    if (index === 1) {
+      document.getElementById("motionState").textContent =
+        "DETECTED";
+    }
+
+    if (index === 2) {
+      document.getElementById("accessLabel").textContent =
+        "CARD VERIFIED";
+
+      document.getElementById("accessStatus").textContent =
+        "GRANTED";
+    }
+
+    if (index === 3) {
+      document.getElementById("fireNodeState").textContent =
+        "EVENT READY";
+
+      document.getElementById("responseState").textContent =
+        "RESPONSE ACTIVE";
+    }
+
+    if (index === 4) {
+      document.getElementById("maintenanceState").textContent =
+        "RESTORING";
+
+      document.getElementById("healthValue").textContent =
+        "96%";
+
+      document.getElementById("healthBar").style.width =
+        "96%";
+    }
+
+    if (index === 5) {
+      document.getElementById("flowState").textContent =
+        "ACTIVE / 24H";
+    }
+
+    if (index === 6) {
+      document.getElementById("nodeCount").textContent =
+        "018";
+    }
+  }
 
 
-      if (
-        interactive
-      ) {
+  /* =======================================================
+     SCENE MOTION
+  ======================================================== */
 
-        body.classList.add(
-          "cursor-active"
-        );
+  function updateSceneMotion(index, local) {
 
-        cursorLabel.textContent =
-          "CONTROL";
+    const scene =
+      scenes[index];
 
-      } else {
+    if (!scene) {
+      return;
+    }
 
-        body.classList.remove(
-          "cursor-active"
-        );
+    const image =
+      scene.querySelector(".scene-image");
 
-        cursorLabel.textContent =
-          "SYSTEM";
+    if (image) {
+
+      const x =
+        (local - .5) * -2;
+
+      const y =
+        Math.sin(local * Math.PI) * -1;
+
+      image.style.transform =
+        `translate3d(${x}%, ${y}%, 0) scale(1.035)`;
+
+    }
+
+
+    if (index === 0) {
+
+      const scan =
+        scene.querySelector(".scan-field");
+
+      if (scan) {
+        scan.style.opacity =
+          local > .03 && local < .97
+            ? "1"
+            : "0";
+      }
+
+    }
+
+
+    if (index === 1) {
+
+      const frame =
+        scene.querySelector(".surveillance-frame");
+
+      if (frame) {
+
+        const scale =
+          .88 + local * .22;
+
+        frame.style.transform =
+          `scale(${scale})`;
 
       }
 
     }
+
+
+    if (index === 4) {
+
+      const value =
+        Math.round(
+          72 + local * 25
+        );
+
+      document.getElementById(
+        "healthValue"
+      ).textContent = `${value}%`;
+
+      document.getElementById(
+        "healthBar"
+      ).style.width = `${value}%`;
+
+    }
+
+  }
+
+
+  /* =======================================================
+     NAVIGATION
+  ======================================================== */
+
+  menuButton.addEventListener(
+    "click",
+    () => {
+      systemNav.classList.add("open");
+    }
   );
 
 
-  /* =========================================================
-     REQUEST MODAL
-  ========================================================== */
+  navClose.addEventListener(
+    "click",
+    () => {
+      systemNav.classList.remove("open");
+    }
+  );
+
+
+  navItems.forEach(
+    (item) => {
+
+      item.addEventListener(
+        "click",
+        () => {
+
+          const target =
+            Number(
+              item.dataset.target
+            );
+
+          const progress =
+            target /
+            (scenes.length - 1);
+
+          setTargetProgress(progress);
+
+          systemNav.classList.remove("open");
+
+        }
+      );
+
+    }
+  );
+
+
+  /* =======================================================
+     MODAL
+  ======================================================== */
 
   function openModal() {
 
-    requestOverlay.classList.add(
-      "is-open"
-    );
-
-    body.style.overflow =
-      "hidden";
+    modal.classList.add("open");
+    document.body.classList.add("modal-open");
 
   }
 
 
   function closeModal() {
 
-    requestOverlay.classList.remove(
-      "is-open"
-    );
-
-    body.style.overflow =
-      "";
+    modal.classList.remove("open");
+    document.body.classList.remove("modal-open");
 
   }
 
 
-  openRequest?.addEventListener(
+  floatingRequest.addEventListener(
     "click",
     openModal
   );
 
 
-  closeRequest?.addEventListener(
+  contactTrigger.addEventListener(
+    "click",
+    openModal
+  );
+
+
+  modalClose.addEventListener(
     "click",
     closeModal
   );
 
 
-  requestOverlay?.addEventListener(
+  modalBackdrop.addEventListener(
     "click",
-    event => {
-
-      if (
-        event.target ===
-        requestOverlay
-      ) {
-
-        closeModal();
-
-      }
-
-    }
+    closeModal
   );
 
 
   document.addEventListener(
     "keydown",
-    event => {
+    (event) => {
 
-      if (
-        event.key ===
-        "Escape"
-      ) {
+      if (event.key === "Escape") {
 
-        if (
-          requestOverlay.classList.contains(
-            "is-open"
-          )
-        ) {
-
+        if (modal.classList.contains("open")) {
           closeModal();
+        }
 
+        if (systemNav.classList.contains("open")) {
+          systemNav.classList.remove("open");
         }
 
       }
@@ -1233,83 +752,78 @@
   );
 
 
-  /* =========================================================
-     FORM SUCCESS
-  ========================================================== */
+  /* =======================================================
+     FORM
+  ======================================================== */
 
-  requestForm?.addEventListener(
+  projectForm.addEventListener(
     "submit",
-    event => {
+    (event) => {
 
       event.preventDefault();
 
-      requestModal.classList.add(
-        "is-success"
+      projectForm.style.display =
+        "none";
+
+      formSuccess.classList.add(
+        "show"
       );
 
     }
   );
 
 
-  /* =========================================================
+  /* =======================================================
+     IMAGE ERROR HANDLING
+  ======================================================== */
+
+  document
+    .querySelectorAll("img")
+    .forEach((image) => {
+
+      image.addEventListener(
+        "error",
+        () => {
+
+          image.classList.add(
+            "image-missing"
+          );
+
+          console.warn(
+            `SENTRA image not found: ${image.getAttribute("src")}`
+          );
+
+        }
+      );
+
+    });
+
+
+  /* =======================================================
      RESIZE
-  ========================================================== */
+  ======================================================== */
 
   window.addEventListener(
     "resize",
     () => {
 
-      const newMobile =
-        window.innerWidth <= 900;
+      const p =
+        getProgressFromScroll();
 
+      targetProgress = p;
+      currentProgress = p;
 
-      if (
-        newMobile === mobile
-      ) {
-        return;
-      }
-
-
-      mobile =
-        newMobile;
-
-
-      if (
-        mobile
-      ) {
-
-        horizontalTrack.style.transform =
-          "none";
-
-        window.scrollTo({
-          top: 0,
-          behavior: "auto"
-        });
-
-        currentProgress = 0;
-        targetProgress = 0;
-
-      } else {
-
-        updateTargetFromScroll();
-
-        currentProgress =
-          targetProgress;
-
-        renderHorizontal();
-
-      }
+      track.style.transform =
+        `translate3d(${-p * window.innerWidth * 7}px, 0, 0)`;
 
     }
   );
 
 
-  /* =========================================================
-     INIT
-  ========================================================== */
+  /* =======================================================
+     INITIAL
+  ======================================================== */
 
-  activateScene(0);
+  updateSceneState(0);
 
-  startLoader();
-
-})();
+});
