@@ -1,56 +1,149 @@
 (() => {
+
   "use strict";
-
-  const body = document.body;
-  const loader = document.getElementById("loader");
-
-  const loaderStatus = document.getElementById("loaderStatus");
-  const loaderPercent = document.getElementById("loaderPercent");
-  const loaderProgress = document.getElementById("loaderProgress");
-
-  const horizontalWorld = document.getElementById("horizontalWorld");
-  const horizontalTrack = document.getElementById("horizontalTrack");
-
-  const scenes = [...document.querySelectorAll(".scene")];
-
-  const sceneIndex = document.getElementById("sceneIndex");
-  const sceneProgress = document.getElementById("sceneProgress");
-
-  const systemTime = document.getElementById("systemTime");
-
-  const cursor = document.getElementById("cursor");
-  const cursorLabel = document.getElementById("cursorLabel");
-
-  const requestOverlay = document.getElementById("requestOverlay");
-  const requestModal = document.querySelector(".request-modal");
-
-  const openRequest = document.getElementById("openRequest");
-  const closeRequest = document.getElementById("closeRequest");
-
-  const requestForm = document.getElementById("requestForm");
-
-  let isMobile = window.innerWidth <= 900;
-
-  let targetProgress = 0;
-  let currentProgress = 0;
-
-  let currentScene = 0;
-  let raf = null;
-
-  const sceneCount = scenes.length;
 
 
   /* =========================================================
-     HELPERS
+     ELEMENTS
   ========================================================== */
 
-  const clamp = (value, min, max) => {
-    return Math.min(Math.max(value, min), max);
-  };
+  const body =
+    document.body;
 
-  const lerp = (a, b, amount) => {
-    return a + (b - a) * amount;
-  };
+  const loader =
+    document.getElementById(
+      "loader"
+    );
+
+  const loaderStatus =
+    document.getElementById(
+      "loaderStatus"
+    );
+
+  const loaderPercent =
+    document.getElementById(
+      "loaderPercent"
+    );
+
+  const loaderProgress =
+    document.getElementById(
+      "loaderProgress"
+    );
+
+  const horizontalWorld =
+    document.getElementById(
+      "horizontalWorld"
+    );
+
+  const horizontalTrack =
+    document.getElementById(
+      "horizontalTrack"
+    );
+
+  const scenes =
+    [...document.querySelectorAll(
+      ".scene"
+    )];
+
+  const sceneIndex =
+    document.getElementById(
+      "sceneIndex"
+    );
+
+  const sceneProgress =
+    document.getElementById(
+      "sceneProgress"
+    );
+
+  const systemTime =
+    document.getElementById(
+      "systemTime"
+    );
+
+  const cursor =
+    document.getElementById(
+      "cursor"
+    );
+
+  const cursorLabel =
+    document.getElementById(
+      "cursorLabel"
+    );
+
+  const requestOverlay =
+    document.getElementById(
+      "requestOverlay"
+    );
+
+  const requestModal =
+    document.querySelector(
+      ".request-modal"
+    );
+
+  const openRequest =
+    document.getElementById(
+      "openRequest"
+    );
+
+  const closeRequest =
+    document.getElementById(
+      "closeRequest"
+    );
+
+  const requestForm =
+    document.getElementById(
+      "requestForm"
+    );
+
+
+  /* =========================================================
+     STATE
+  ========================================================== */
+
+  let mobile =
+    window.innerWidth <= 900;
+
+  let targetProgress = 0;
+
+  let currentProgress = 0;
+
+  let currentScene = 0;
+
+  let lastScroll =
+    window.scrollY;
+
+  let animationFrame = null;
+
+
+  /* =========================================================
+     UTILITY
+  ========================================================== */
+
+  const clamp =
+    (value, min, max) =>
+      Math.min(
+        Math.max(
+          value,
+          min
+        ),
+        max
+      );
+
+
+  const lerp =
+    (a, b, amount) =>
+      a + (b - a) * amount;
+
+
+  const wait =
+    ms =>
+      new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            ms
+          )
+      );
 
 
   /* =========================================================
@@ -58,17 +151,36 @@
   ========================================================== */
 
   function updateClock() {
-    const now = new Date();
 
-    const hh = String(now.getHours()).padStart(2, "0");
-    const mm = String(now.getMinutes()).padStart(2, "0");
-    const ss = String(now.getSeconds()).padStart(2, "0");
+    const now =
+      new Date();
 
-    systemTime.textContent = `${hh}:${mm}:${ss}`;
+    const h =
+      String(
+        now.getHours()
+      ).padStart(2, "0");
+
+    const m =
+      String(
+        now.getMinutes()
+      ).padStart(2, "0");
+
+    const s =
+      String(
+        now.getSeconds()
+      ).padStart(2, "0");
+
+    systemTime.textContent =
+      `${h}:${m}:${s}`;
   }
 
+
   updateClock();
-  setInterval(updateClock, 1000);
+
+  setInterval(
+    updateClock,
+    1000
+  );
 
 
   /* =========================================================
@@ -76,222 +188,330 @@
   ========================================================== */
 
   const loaderStates = [
+
     {
-      progress: 12,
-      text: "SYSTEM INITIALIZATION"
+      value: 8,
+      text:
+        "SYSTEM INITIALIZATION"
     },
+
     {
-      progress: 37,
-      text: "NETWORK CONNECTED"
+      value: 26,
+      text:
+        "CENTRAL NODE ACTIVE"
     },
+
     {
-      progress: 68,
-      text: "OBJECT DETECTED"
+      value: 47,
+      text:
+        "NETWORK CONNECTED"
     },
+
     {
-      progress: 100,
-      text: "SYSTEM ONLINE"
+      value: 71,
+      text:
+        "OBJECT DETECTED"
+    },
+
+    {
+      value: 88,
+      text:
+        "CONTROL NETWORK ACTIVE"
+    },
+
+    {
+      value: 100,
+      text:
+        "SYSTEM ONLINE"
     }
+
   ];
 
-  async function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
-  async function runLoader() {
+  async function animateLoader(
+    from,
+    to
+  ) {
 
-    body.classList.add("is-loading");
-    loader.classList.add("is-running");
+    const duration = 600;
 
-    await sleep(500);
+    const start =
+      performance.now();
 
-    for (const state of loaderStates) {
+    return new Promise(
+      resolve => {
 
-      loaderStatus.textContent = state.text;
+        function frame(
+          timestamp
+        ) {
 
-      const start = Number(
-        loaderPercent.textContent.replace("%", "")
-      ) || 0;
+          const progress =
+            clamp(
+              (
+                timestamp -
+                start
+              ) / duration,
+              0,
+              1
+            );
 
-      const end = state.progress;
-
-      const duration = 650;
-
-      const started = performance.now();
-
-      await new Promise(resolve => {
-
-        function tick(now) {
-
-          const progress = clamp(
-            (now - started) / duration,
-            0,
-            1
-          );
-
-          const value = Math.round(
-            lerp(start, end, progress)
-          );
+          const value =
+            Math.round(
+              from +
+              (
+                to - from
+              ) *
+              progress
+            );
 
           loaderPercent.textContent =
             `${String(value).padStart(2, "0")}%`;
 
-          loaderProgress.style.width = `${value}%`;
+          loaderProgress.style.width =
+            `${value}%`;
 
-          if (progress < 1) {
-            requestAnimationFrame(tick);
+          if (
+            progress < 1
+          ) {
+
+            requestAnimationFrame(
+              frame
+            );
+
           } else {
+
             resolve();
+
           }
+
         }
 
-        requestAnimationFrame(tick);
-      });
+        requestAnimationFrame(
+          frame
+        );
 
-      await sleep(320);
+      }
+    );
+  }
+
+
+  async function startLoader() {
+
+    body.classList.add(
+      "is-loading"
+    );
+
+    let previous = 0;
+
+    await wait(450);
+
+
+    for (
+      const state
+      of loaderStates
+    ) {
+
+      loaderStatus.textContent =
+        state.text;
+
+      await animateLoader(
+        previous,
+        state.value
+      );
+
+      previous =
+        state.value;
+
+      await wait(260);
+
     }
 
-    await sleep(650);
 
-    loader.classList.add("is-hidden");
-    body.classList.remove("is-loading");
+    await wait(850);
 
-    startHorizontalSystem();
+    loader.classList.add(
+      "is-hidden"
+    );
+
+    body.classList.remove(
+      "is-loading"
+    );
+
+
+    setTimeout(
+      () => {
+
+        if (!mobile) {
+          initializeHorizontal();
+        }
+
+      },
+      300
+    );
+
   }
 
 
   /* =========================================================
-     HORIZONTAL SYSTEM
+     HORIZONTAL SCROLL
   ========================================================== */
 
   function getMaxScroll() {
 
-    if (isMobile) {
-      return 0;
-    }
-
     return Math.max(
-      horizontalWorld.offsetHeight - window.innerHeight,
+      document.documentElement
+        .scrollHeight -
+      window.innerHeight,
       1
     );
+
   }
 
 
   function getHorizontalDistance() {
 
-    if (isMobile) {
-      return 0;
-    }
-
     return Math.max(
-      horizontalTrack.scrollWidth - window.innerWidth,
+      horizontalTrack.scrollWidth -
+      window.innerWidth,
       0
     );
+
   }
 
 
-  function applyHorizontalPosition(progress) {
+  function updateTargetFromScroll() {
 
-    if (isMobile) {
-      horizontalTrack.style.transform = "none";
+    if (mobile) {
       return;
     }
 
-    const distance = getHorizontalDistance();
+    const max =
+      getMaxScroll();
 
-    const x = distance * progress;
+    targetProgress =
+      clamp(
+        window.scrollY /
+        max,
+        0,
+        1
+      );
+
+  }
+
+
+  function renderHorizontal() {
+
+    if (mobile) {
+
+      horizontalTrack.style.transform =
+        "none";
+
+      return;
+
+    }
+
+
+    const distance =
+      getHorizontalDistance();
+
+    const x =
+      distance *
+      currentProgress;
+
 
     horizontalTrack.style.transform =
-      `translate3d(${-x}px, 0, 0)`;
-  }
+      `translate3d(${-x}px,0,0)`;
 
-
-  function updateFromScroll() {
-
-    if (isMobile) {
-      return;
-    }
-
-    const maxScroll = getMaxScroll();
-
-    targetProgress = clamp(
-      window.scrollY / maxScroll,
-      0,
-      1
-    );
   }
 
 
   function animateHorizontal() {
 
-    currentProgress = lerp(
-      currentProgress,
-      targetProgress,
-      0.075
+    currentProgress =
+      lerp(
+        currentProgress,
+        targetProgress,
+        .075
+      );
+
+
+    renderHorizontal();
+
+
+    const scenePosition =
+      currentProgress *
+      (
+        scenes.length - 1
+      );
+
+
+    updateScene(
+      scenePosition
     );
 
-    applyHorizontalPosition(currentProgress);
 
-    const rawScene =
-      currentProgress * (sceneCount - 1);
+    animationFrame =
+      requestAnimationFrame(
+        animateHorizontal
+      );
 
-    const nextScene =
-      Math.round(rawScene);
-
-    if (nextScene !== currentScene) {
-      activateScene(nextScene);
-    }
-
-    updateSceneUI(rawScene);
-
-    raf = requestAnimationFrame(
-      animateHorizontal
-    );
   }
 
 
-  function scrollToProgress(progress) {
+  function initializeHorizontal() {
 
-    if (isMobile) {
+    if (mobile) {
       return;
     }
 
-    const maxScroll = getMaxScroll();
 
-    const y = progress * maxScroll;
+    updateTargetFromScroll();
 
-    window.scrollTo({
-      top: y,
-      behavior: "smooth"
-    });
-  }
+    currentProgress =
+      targetProgress;
 
+    renderHorizontal();
 
-  function startHorizontalSystem() {
-
-    if (isMobile) {
-      activateScene(0);
-      return;
-    }
-
-    updateFromScroll();
-
-    currentProgress = targetProgress;
-
-    applyHorizontalPosition(currentProgress);
-
-    activateScene(
-      Math.round(
-        currentProgress * (sceneCount - 1)
+    updateScene(
+      currentProgress *
+      (
+        scenes.length - 1
       )
     );
 
-    if (!raf) {
-      raf = requestAnimationFrame(
-        animateHorizontal
-      );
+
+    if (
+      !animationFrame
+    ) {
+
+      animationFrame =
+        requestAnimationFrame(
+          animateHorizontal
+        );
+
     }
+
   }
+
+
+  window.addEventListener(
+    "scroll",
+    () => {
+
+      if (mobile) {
+        return;
+      }
+
+      updateTargetFromScroll();
+
+      lastScroll =
+        window.scrollY;
+
+    },
+    {
+      passive: true
+    }
+  );
 
 
   /* =========================================================
@@ -303,32 +523,45 @@
     event => {
 
       if (
-        isMobile ||
-        body.classList.contains("is-loading") ||
-        requestOverlay.classList.contains("is-open")
+        mobile ||
+        body.classList.contains(
+          "is-loading"
+        ) ||
+        requestOverlay.classList.contains(
+          "is-open"
+        )
       ) {
         return;
       }
 
-      const intensity =
-        Math.abs(event.deltaY) > Math.abs(event.deltaX)
-          ? event.deltaY
-          : event.deltaX;
-
-      if (Math.abs(intensity) < 1) {
-        return;
-      }
 
       event.preventDefault();
 
-      const maxScroll = getMaxScroll();
+
+      const delta =
+        Math.abs(
+          event.deltaY
+        ) >
+        Math.abs(
+          event.deltaX
+        )
+          ? event.deltaY
+          : event.deltaX;
+
+
+      const max =
+        getMaxScroll();
+
 
       const next =
         clamp(
-          window.scrollY + intensity * 0.85,
+          window.scrollY +
+          delta *
+          1.35,
           0,
-          maxScroll
+          max
         );
+
 
       window.scrollTo({
         top: next,
@@ -336,18 +569,9 @@
       });
 
     },
-    { passive: false }
-  );
-
-
-  /* =========================================================
-     SCROLL
-  ========================================================== */
-
-  window.addEventListener(
-    "scroll",
-    updateFromScroll,
-    { passive: true }
+    {
+      passive: false
+    }
   );
 
 
@@ -360,109 +584,221 @@
     event => {
 
       if (
-        isMobile ||
-        requestOverlay.classList.contains("is-open")
+        mobile ||
+        requestOverlay.classList.contains(
+          "is-open"
+        )
       ) {
         return;
       }
 
-      if (
-        event.key === "ArrowRight" ||
-        event.key === "PageDown"
-      ) {
-        event.preventDefault();
 
-        scrollToProgress(
-          clamp(
-            targetProgress + 1 / (sceneCount - 1),
-            0,
-            1
-          )
+      const step =
+        1 /
+        (
+          scenes.length - 1
         );
-      }
+
 
       if (
-        event.key === "ArrowLeft" ||
-        event.key === "PageUp"
+        event.key ===
+        "ArrowRight"
       ) {
+
         event.preventDefault();
 
-        scrollToProgress(
-          clamp(
-            targetProgress - 1 / (sceneCount - 1),
-            0,
-            1
-          )
+        moveTo(
+          targetProgress +
+          step
         );
+
       }
 
-      if (event.key === "Home") {
+
+      if (
+        event.key ===
+        "ArrowLeft"
+      ) {
+
         event.preventDefault();
-        scrollToProgress(0);
+
+        moveTo(
+          targetProgress -
+          step
+        );
+
       }
 
-      if (event.key === "End") {
+
+      if (
+        event.key ===
+        "PageDown"
+      ) {
+
         event.preventDefault();
-        scrollToProgress(1);
+
+        moveTo(
+          targetProgress +
+          step
+        );
+
       }
+
+
+      if (
+        event.key ===
+        "PageUp"
+      ) {
+
+        event.preventDefault();
+
+        moveTo(
+          targetProgress -
+          step
+        );
+
+      }
+
+
+      if (
+        event.key ===
+        "Home"
+      ) {
+
+        event.preventDefault();
+
+        moveTo(0);
+
+      }
+
+
+      if (
+        event.key ===
+        "End"
+      ) {
+
+        event.preventDefault();
+
+        moveTo(1);
+
+      }
+
     }
   );
 
 
+  function moveTo(
+    progress
+  ) {
+
+    const max =
+      getMaxScroll();
+
+    const value =
+      clamp(
+        progress,
+        0,
+        1
+      );
+
+
+    window.scrollTo({
+      top:
+        value *
+        max,
+
+      behavior:
+        "smooth"
+    });
+
+  }
+
+
   /* =========================================================
-     SCENE ACTIVATION
+     SCENE UPDATE
   ========================================================== */
 
-  function activateScene(index) {
+  function updateScene(
+    scenePosition
+  ) {
 
-    index = clamp(
-      index,
-      0,
-      sceneCount - 1
-    );
+    const index =
+      Math.round(
+        scenePosition
+      );
 
-    currentScene = index;
+
+    if (
+      index !== currentScene
+    ) {
+
+      currentScene =
+        index;
+
+      activateScene(
+        index
+      );
+
+    }
+
+
+    sceneIndex.textContent =
+      String(
+        index + 1
+      ).padStart(
+        2,
+        "0"
+      );
+
+
+    sceneProgress.style.height =
+      `${(
+        (
+          scenePosition + 1
+        ) /
+        scenes.length
+      ) * 100}%`;
+
+  }
+
+
+  function activateScene(
+    index
+  ) {
 
     scenes.forEach(
-      (scene, sceneIndexValue) => {
+      (
+        scene,
+        sceneIndexValue
+      ) => {
 
         scene.classList.toggle(
           "active",
-          sceneIndexValue === index
+          sceneIndexValue ===
+          index
         );
 
       }
     );
 
-    sceneIndex.textContent =
-      String(index + 1).padStart(2, "0");
 
-    sceneProgress.style.height =
-      `${((index + 1) / sceneCount) * 100}%`;
+    if (
+      index === 2
+    ) {
 
-    if (index === 2) {
-      runAccessSequence();
+      playAccess();
+
     }
 
-    if (index === 3) {
-      runSecuritySequence();
+
+    if (
+      index === 3
+    ) {
+
+      playSecurity();
+
     }
-  }
 
-
-  function updateSceneUI(rawScene) {
-
-    const normalized =
-      clamp(rawScene, 0, sceneCount - 1);
-
-    const visualIndex =
-      Math.round(normalized);
-
-    sceneIndex.textContent =
-      String(visualIndex + 1).padStart(2, "0");
-
-    sceneProgress.style.height =
-      `${((normalized + 1) / sceneCount) * 100}%`;
   }
 
 
@@ -470,129 +806,187 @@
      ACCESS SEQUENCE
   ========================================================== */
 
-  let accessTimer = null;
+  let accessInterval = null;
 
-  function runAccessSequence() {
 
-    clearTimeout(accessTimer);
+  function playAccess() {
 
-    const items = [
-      ...document.querySelectorAll(
-        ".sequence-item"
-      )
-    ];
+    clearInterval(
+      accessInterval
+    );
+
+
+    const sequence =
+      [
+        ...document.querySelectorAll(
+          ".sequence-item"
+        )
+      ];
+
+
+    sequence.forEach(
+      item =>
+        item.classList.remove(
+          "active"
+        )
+    );
+
 
     let index = 0;
 
-    items.forEach(
-      item => item.classList.remove("active")
-    );
 
-    function step() {
+    accessInterval =
+      setInterval(
+        () => {
 
-      items.forEach(
-        item => item.classList.remove("active")
+          sequence.forEach(
+            (
+              item,
+              itemIndex
+            ) => {
+
+              item.classList.toggle(
+                "active",
+                itemIndex <= index
+              );
+
+            }
+          );
+
+
+          index++;
+
+
+          if (
+            index >=
+            sequence.length
+          ) {
+
+            clearInterval(
+              accessInterval
+            );
+
+            setTimeout(
+              () => {
+
+                if (
+                  currentScene === 2
+                ) {
+
+                  playAccess();
+
+                }
+
+              },
+              1500
+            );
+
+          }
+
+        },
+        600
       );
 
-      if (items[index]) {
-        items[index].classList.add("active");
-      }
-
-      index++;
-
-      if (index < items.length) {
-
-        accessTimer = setTimeout(
-          step,
-          850
-        );
-
-      } else {
-
-        accessTimer = setTimeout(
-          () => {
-            items.forEach(
-              item => item.classList.add("active")
-            );
-          },
-          700
-        );
-      }
-    }
-
-    step();
   }
 
 
   /* =========================================================
-     SECURITY RESPONSE
+     SECURITY SEQUENCE
   ========================================================== */
 
-  let securityTimer = null;
+  let securityInterval = null;
 
-  function runSecuritySequence() {
 
-    clearTimeout(securityTimer);
+  function playSecurity() {
 
-    const states = [
-      ...document.querySelectorAll(
-        ".console-state"
-      )
-    ];
+    clearInterval(
+      securityInterval
+    );
+
+
+    const states =
+      [
+        ...document.querySelectorAll(
+          ".console-state"
+        )
+      ];
+
 
     states.forEach(
       state => {
-        state.classList.remove("active");
+
+        state.style.opacity =
+          ".25";
+
+        state.style.color =
+          "";
+
       }
     );
 
+
     let index = 0;
 
-    function step() {
 
-      states.forEach(
-        state => {
-          state.style.opacity = ".4";
-          state.style.color = "";
-        }
-      );
+    securityInterval =
+      setInterval(
+        () => {
 
-      if (states[index]) {
+          states.forEach(
+            (
+              state,
+              stateIndex
+            ) => {
 
-        states[index].style.opacity = "1";
-        states[index].style.color =
-          "var(--gold)";
-      }
+              state.style.opacity =
+                stateIndex === index
+                  ? "1"
+                  : ".25";
 
-      index++;
 
-      if (index < states.length) {
+              state.style.color =
+                stateIndex === index
+                  ? "var(--gold)"
+                  : "";
 
-        securityTimer = setTimeout(
-          step,
-          900
-        );
+            }
+          );
 
-      } else {
 
-        securityTimer = setTimeout(
-          () => {
+          index++;
 
-            states.forEach(
-              state => {
-                state.style.opacity = ".75";
-                state.style.color =
-                  "var(--gold)";
-              }
+
+          if (
+            index >=
+            states.length
+          ) {
+
+            clearInterval(
+              securityInterval
             );
 
-          },
-          800
-        );
-      }
-    }
 
-    step();
+            setTimeout(
+              () => {
+
+                if (
+                  currentScene === 3
+                ) {
+
+                  playSecurity();
+
+                }
+
+              },
+              1700
+            );
+
+          }
+
+        },
+        850
+      );
+
   }
 
 
@@ -600,31 +994,55 @@
      IMAGE PARALLAX
   ========================================================== */
 
-  document.addEventListener(
+  window.addEventListener(
     "mousemove",
     event => {
 
       if (
-        isMobile ||
-        body.classList.contains("is-loading")
+        mobile ||
+        body.classList.contains(
+          "is-loading"
+        )
       ) {
         return;
       }
 
+
       const x =
-        event.clientX / window.innerWidth - .5;
+        (
+          event.clientX /
+          window.innerWidth
+        ) -
+        .5;
+
 
       const y =
-        event.clientY / window.innerHeight - .5;
+        (
+          event.clientY /
+          window.innerHeight
+        ) -
+        .5;
+
 
       document
-        .querySelectorAll(".image-frame img")
-        .forEach(img => {
+        .querySelectorAll(
+          ".scene-image img"
+        )
+        .forEach(
+          img => {
 
-          img.style.transform =
-            `scale(1.025)
-             translate3d(${x * -10}px, ${y * -8}px, 0)`;
-        });
+            img.style.setProperty(
+              "--px",
+              `${x * -12}px`
+            );
+
+            img.style.setProperty(
+              "--py",
+              `${y * -8}px`
+            );
+
+          }
+        );
 
     }
   );
@@ -634,57 +1052,67 @@
      CURSOR
   ========================================================== */
 
+  let mouseX = 0;
+  let mouseY = 0;
+
   let cursorX = 0;
   let cursorY = 0;
 
-  let cursorTargetX = 0;
-  let cursorTargetY = 0;
-
-  function animateCursor() {
-
-    cursorTargetX =
-      lerp(cursorTargetX, cursorX, .18);
-
-    cursorTargetY =
-      lerp(cursorTargetY, cursorY, .18);
-
-    cursor.style.left =
-      `${cursorTargetX}px`;
-
-    cursor.style.top =
-      `${cursorTargetY}px`;
-
-    cursorLabel.style.left =
-      `${cursorTargetX}px`;
-
-    cursorLabel.style.top =
-      `${cursorTargetY}px`;
-
-    requestAnimationFrame(
-      animateCursor
-    );
-  }
 
   window.addEventListener(
     "mousemove",
     event => {
 
-      cursorX = event.clientX;
-      cursorY = event.clientY;
+      mouseX =
+        event.clientX;
+
+      mouseY =
+        event.clientY;
 
     }
   );
+
+
+  function animateCursor() {
+
+    cursorX =
+      lerp(
+        cursorX,
+        mouseX,
+        .18
+      );
+
+
+    cursorY =
+      lerp(
+        cursorY,
+        mouseY,
+        .18
+      );
+
+
+    cursor.style.left =
+      `${cursorX}px`;
+
+    cursor.style.top =
+      `${cursorY}px`;
+
+
+    cursorLabel.style.left =
+      `${cursorX}px`;
+
+    cursorLabel.style.top =
+      `${cursorY}px`;
+
+
+    requestAnimationFrame(
+      animateCursor
+    );
+
+  }
+
 
   animateCursor();
-
-
-  document.addEventListener(
-    "mouseenter",
-    () => {
-      cursor.style.opacity = "1";
-      cursorLabel.style.opacity = "1";
-    }
-  );
 
 
   document.addEventListener(
@@ -696,16 +1124,17 @@
           "button, a, input, textarea"
         );
 
-      if (interactive) {
+
+      if (
+        interactive
+      ) {
 
         body.classList.add(
           "cursor-active"
         );
 
         cursorLabel.textContent =
-          interactive.tagName === "BUTTON"
-            ? "CONTROL"
-            : "OPEN";
+          "CONTROL";
 
       } else {
 
@@ -715,61 +1144,64 @@
 
         cursorLabel.textContent =
           "SYSTEM";
+
       }
+
     }
   );
 
 
   /* =========================================================
-     REQUEST POPUP
+     REQUEST MODAL
   ========================================================== */
 
-  function openRequestModal() {
+  function openModal() {
 
     requestOverlay.classList.add(
       "is-open"
     );
 
-    requestModal.classList.remove(
-      "is-success"
-    );
+    body.style.overflow =
+      "hidden";
 
-    body.style.overflow = "hidden";
   }
 
 
-  function closeRequestModal() {
+  function closeModal() {
 
     requestOverlay.classList.remove(
       "is-open"
     );
 
-    body.style.overflow = "";
+    body.style.overflow =
+      "";
 
-    requestModal.classList.remove(
-      "is-success"
-    );
   }
 
 
-  openRequest.addEventListener(
+  openRequest?.addEventListener(
     "click",
-    openRequestModal
+    openModal
   );
 
 
-  closeRequest.addEventListener(
+  closeRequest?.addEventListener(
     "click",
-    closeRequestModal
+    closeModal
   );
 
 
-  requestOverlay.addEventListener(
+  requestOverlay?.addEventListener(
     "click",
     event => {
 
-      if (event.target === requestOverlay) {
-        closeRequestModal();
+      if (
+        event.target ===
+        requestOverlay
+      ) {
+
+        closeModal();
+
       }
 
     }
@@ -781,10 +1213,20 @@
     event => {
 
       if (
-        event.key === "Escape" &&
-        requestOverlay.classList.contains("is-open")
+        event.key ===
+        "Escape"
       ) {
-        closeRequestModal();
+
+        if (
+          requestOverlay.classList.contains(
+            "is-open"
+          )
+        ) {
+
+          closeModal();
+
+        }
+
       }
 
     }
@@ -792,10 +1234,10 @@
 
 
   /* =========================================================
-     REQUEST FORM
+     FORM SUCCESS
   ========================================================== */
 
-  requestForm.addEventListener(
+  requestForm?.addEventListener(
     "submit",
     event => {
 
@@ -810,37 +1252,6 @@
 
 
   /* =========================================================
-     IMAGE ERROR HANDLING
-  ========================================================== */
-
-  document
-    .querySelectorAll("img")
-    .forEach(img => {
-
-      img.addEventListener(
-        "error",
-        () => {
-
-          img.style.opacity = "0";
-
-          const parent =
-            img.closest(
-              ".image-frame, .author-logo-wrap, .sentra-logo-wrap, .control-logo-wrap"
-            );
-
-          if (parent) {
-            parent.classList.add(
-              "image-missing"
-            );
-          }
-
-        }
-      );
-
-    });
-
-
-  /* =========================================================
      RESIZE
   ========================================================== */
 
@@ -848,33 +1259,45 @@
     "resize",
     () => {
 
-      const nextMobile =
+      const newMobile =
         window.innerWidth <= 900;
 
-      if (nextMobile !== isMobile) {
 
-        isMobile = nextMobile;
+      if (
+        newMobile === mobile
+      ) {
+        return;
+      }
 
-        if (isMobile) {
 
-          horizontalTrack.style.transform =
-            "none";
+      mobile =
+        newMobile;
 
-          window.scrollTo({
-            top: 0,
-            behavior: "auto"
-          });
 
-          currentProgress = 0;
-          targetProgress = 0;
+      if (
+        mobile
+      ) {
 
-        } else {
+        horizontalTrack.style.transform =
+          "none";
 
-          horizontalWorld.style.height =
-            "800vh";
+        window.scrollTo({
+          top: 0,
+          behavior: "auto"
+        });
 
-          updateFromScroll();
-        }
+        currentProgress = 0;
+        targetProgress = 0;
+
+      } else {
+
+        updateTargetFromScroll();
+
+        currentProgress =
+          targetProgress;
+
+        renderHorizontal();
+
       }
 
     }
@@ -882,11 +1305,11 @@
 
 
   /* =========================================================
-     INITIALIZATION
+     INIT
   ========================================================== */
 
   activateScene(0);
 
-  runLoader();
+  startLoader();
 
 })();
