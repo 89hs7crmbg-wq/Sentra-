@@ -1,829 +1,554 @@
-/* =========================================================
-   SENTRA / SYSTEM ENGINE
-========================================================= */
+const loader = document.getElementById("loader");
+const loaderProgress = document.getElementById("loaderProgress");
+const loaderPercent = document.getElementById("loaderPercent");
+const loaderStatus = document.getElementById("loaderStatus");
 
-document.addEventListener("DOMContentLoaded", () => {
+const experience = document.getElementById("experience");
+const track = document.getElementById("track");
 
-  const loader = document.getElementById("loader");
-  const loaderStatus = document.getElementById("loaderStatus");
-  const loaderProgress = document.getElementById("loaderProgress");
-  const loaderPercent = document.getElementById("loaderPercent");
-  const loaderCode = document.getElementById("loaderCode");
+const progressBar = document.getElementById("progressBar");
+const currentScene = document.getElementById("currentScene");
 
-  const system = document.getElementById("system");
-  const stage = document.getElementById("horizontalStage");
-  const track = document.getElementById("horizontalTrack");
+const floatingCta = document.getElementById("floatingCta");
+const requestModal = document.getElementById("requestModal");
+const modalClose = document.getElementById("modalClose");
+const openRequest = document.getElementById("openRequest");
 
-  const sceneNumber = document.getElementById("sceneNumber");
-  const globalStatus = document.getElementById("globalStatus");
-  const progressPercent = document.getElementById("progressPercent");
-  const progressFill = document.getElementById("progressFill");
-  const progressNode = document.getElementById("progressNode");
-  const mobilePosition = document.getElementById("mobilePosition");
+const requestForm = document.getElementById("requestForm");
+const formSuccess = document.getElementById("formSuccess");
 
-  const scenes = [...document.querySelectorAll(".scene")];
-  const navItems = [...document.querySelectorAll(".nav-item")];
+const menuButton = document.getElementById("menuButton");
+const menuClose = document.getElementById("menuClose");
+const mobileMenu = document.getElementById("mobileMenu");
 
-  const menuButton = document.getElementById("menuButton");
-  const systemNav = document.getElementById("systemNav");
-  const navClose = document.getElementById("navClose");
+const sceneCount = 8;
 
-  const floatingRequest = document.getElementById("floatingRequest");
-  const contactTrigger = document.getElementById("contactTrigger");
+let currentProgress = 0;
+let targetProgress = 0;
 
-  const modal = document.getElementById("projectModal");
-  const modalClose = document.getElementById("modalClose");
-  const modalBackdrop = document.querySelector(".modal-backdrop");
+let dragging = false;
+let dragStartX = 0;
+let dragStartProgress = 0;
 
-  const projectForm = document.getElementById("projectForm");
-  const formSuccess = document.getElementById("formSuccess");
+let touchStartX = 0;
+let touchLastX = 0;
+let touchStartProgress = 0;
+
+let wheelAccumulator = 0;
+let lastTime = performance.now();
+
+const isMobile = () => window.innerWidth <= 760;
 
 
-  /* =======================================================
-     LOADER
-  ======================================================== */
+/* -------------------------------------------------
+   LOADER
+------------------------------------------------- */
 
-  const loaderSteps = [
+const loaderSteps = [
     {
-      text: "SYSTEM INITIALIZATION",
-      code: "NODE 00"
+        text: "СИСТЕМА ИНИЦИАЛИЗИРУЕТСЯ",
+        start: 0,
+        end: 24
     },
     {
-      text: "NETWORK CONNECTED",
-      code: "NODE 04"
+        text: "СЕТЬ ПОДКЛЮЧЕНА",
+        start: 25,
+        end: 48
     },
     {
-      text: "OBJECT DETECTED",
-      code: "OBJECT 01"
+        text: "ОБЪЕКТ ОБНАРУЖЕН",
+        start: 49,
+        end: 76
     },
     {
-      text: "SYSTEM ONLINE",
-      code: "SENTRA / ACTIVE"
+        text: "СИСТЕМА АКТИВНА",
+        start: 77,
+        end: 100
     }
-  ];
+];
 
-  let loaderStart = performance.now();
+const loaderStart = performance.now();
+const loaderDuration = 3600;
 
-  function runLoader(now) {
+function runLoader(now) {
 
     const elapsed = now - loaderStart;
-    const duration = 4300;
-    const progress = Math.min(elapsed / duration, 1);
-
+    const progress = Math.min(elapsed / loaderDuration, 1);
     const percent = Math.floor(progress * 100);
 
     loaderProgress.style.width = `${percent}%`;
-    loaderPercent.textContent = String(percent).padStart(2, "0");
+    loaderPercent.textContent = `${String(percent).padStart(2, "0")}%`;
 
-    let step;
+    const step = loaderSteps.find(
+        item => percent >= item.start && percent <= item.end
+    );
 
-    if (progress < .27) {
-      step = loaderSteps[0];
-    } else if (progress < .53) {
-      step = loaderSteps[1];
-    } else if (progress < .78) {
-      step = loaderSteps[2];
-    } else {
-      step = loaderSteps[3];
+    if (step) {
+        loaderStatus.textContent = step.text;
     }
-
-    loaderStatus.textContent = step.text;
-    loaderCode.textContent = step.code;
 
     if (progress < 1) {
-      requestAnimationFrame(runLoader);
+        requestAnimationFrame(runLoader);
     } else {
-      setTimeout(() => {
-        loader.classList.add("is-done");
-        system.classList.add("ready");
-        document.body.classList.add("system-ready");
-      }, 650);
+
+        setTimeout(() => {
+            loader.classList.add("hidden");
+
+            setTimeout(() => {
+                document.body.classList.add("ready");
+            }, 700);
+
+        }, 350);
     }
-  }
+}
 
-  requestAnimationFrame(runLoader);
-
-
-  /* =======================================================
-     STATE
-  ======================================================== */
-
-  let currentProgress = 0;
-  let targetProgress = 0;
-  let currentScene = 0;
-  let raf = null;
-
-  function maxScroll() {
-    return Math.max(
-      0,
-      stage.offsetHeight - window.innerHeight
-    );
-  }
-
-  function getProgressFromScroll() {
-    const max = maxScroll();
-
-    if (!max) {
-      return 0;
-    }
-
-    return Math.min(
-      1,
-      Math.max(
-        0,
-        window.scrollY / max
-      )
-    );
-  }
+requestAnimationFrame(runLoader);
 
 
-  /* =======================================================
-     TRACK
-  ======================================================== */
+/* -------------------------------------------------
+   HORIZONTAL ENGINE
+------------------------------------------------- */
 
-  function render() {
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function setProgress(value) {
+
+    targetProgress = clamp(value, 0, 1);
+}
+
+function moveByPixels(delta) {
+
+    const maxDistance =
+        Math.max(window.innerWidth * (sceneCount - 1), 1);
+
+    setProgress(targetProgress + delta / maxDistance);
+}
+
+function goToScene(index) {
+
+    const target = clamp(index, 0, sceneCount - 1);
+
+    setProgress(target / (sceneCount - 1));
+
+    closeMobileMenu();
+}
+
+function render(now) {
+
+    const delta = Math.min((now - lastTime) / 1000, .05);
+    lastTime = now;
+
+    const ease = 1 - Math.pow(.0005, delta);
 
     currentProgress +=
-      (targetProgress - currentProgress) * .11;
+        (targetProgress - currentProgress) * ease;
 
-    const travel =
-      window.innerWidth * 7;
-
-    const x =
-      currentProgress * travel;
+    const distance =
+        currentProgress * window.innerWidth * (sceneCount - 1);
 
     track.style.transform =
-      `translate3d(${-x}px, 0, 0)`;
+        `translate3d(${-distance}px, 0, 0)`;
 
-    updateInterface(currentProgress);
+    updateInterface();
 
-    raf = requestAnimationFrame(render);
-  }
+    requestAnimationFrame(render);
+}
 
-  raf = requestAnimationFrame(render);
+requestAnimationFrame(render);
 
 
-  /* =======================================================
-     TARGET SCROLL
-  ======================================================== */
+/* -------------------------------------------------
+   INTERFACE
+------------------------------------------------- */
 
-  function setTargetProgress(value) {
-
-    targetProgress = Math.min(
-      1,
-      Math.max(
-        0,
-        value
-      )
-    );
-
-    const scrollPosition =
-      targetProgress * maxScroll();
-
-    window.scrollTo({
-      top: scrollPosition,
-      behavior: "auto"
-    });
-  }
-
-
-  function moveByDelta(delta) {
-
-    const max = maxScroll();
-
-    if (!max) {
-      return;
-    }
-
-    const sensitivity =
-      window.innerWidth <= 900
-        ? 0.00115
-        : 0.00075;
-
-    targetProgress +=
-      delta * sensitivity;
-
-    targetProgress = Math.min(
-      1,
-      Math.max(
-        0,
-        targetProgress
-      )
-    );
-
-    window.scrollTo({
-      top: targetProgress * max,
-      behavior: "auto"
-    });
-  }
-
-
-  /* =======================================================
-     WHEEL
-  ======================================================== */
-
-  let wheelLocked = false;
-
-  window.addEventListener(
-    "wheel",
-    (event) => {
-
-      if (
-        modal.classList.contains("open") ||
-        systemNav.classList.contains("open")
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-
-      if (wheelLocked) {
-        return;
-      }
-
-      wheelLocked = true;
-
-      const delta =
-        Math.abs(event.deltaY) > Math.abs(event.deltaX)
-          ? event.deltaY
-          : event.deltaX;
-
-      moveByDelta(delta);
-
-      setTimeout(() => {
-        wheelLocked = false;
-      }, 8);
-
-    },
-    {
-      passive: false
-    }
-  );
-
-
-  /* =======================================================
-     NORMAL SCROLL
-  ======================================================== */
-
-  let scrollTimer = null;
-
-  window.addEventListener(
-    "scroll",
-    () => {
-
-      if (scrollTimer) {
-        clearTimeout(scrollTimer);
-      }
-
-      scrollTimer = setTimeout(() => {
-
-        const p = getProgressFromScroll();
-
-        targetProgress = p;
-
-      }, 5);
-
-    },
-    {
-      passive: true
-    }
-  );
-
-
-  /* =======================================================
-     TOUCH
-  ======================================================== */
-
-  let touchStartY = 0;
-  let touchLastY = 0;
-
-  window.addEventListener(
-    "touchstart",
-    (event) => {
-
-      if (
-        modal.classList.contains("open") ||
-        systemNav.classList.contains("open")
-      ) {
-        return;
-      }
-
-      touchStartY =
-        event.touches[0].clientY;
-
-      touchLastY =
-        touchStartY;
-
-    },
-    {
-      passive: true
-    }
-  );
-
-
-  window.addEventListener(
-    "touchmove",
-    (event) => {
-
-      if (
-        modal.classList.contains("open") ||
-        systemNav.classList.contains("open")
-      ) {
-        return;
-      }
-
-      const y =
-        event.touches[0].clientY;
-
-      const delta =
-        touchLastY - y;
-
-      touchLastY = y;
-
-      moveByDelta(delta * 1.35);
-
-    },
-    {
-      passive: true
-    }
-  );
-
-
-  /* =======================================================
-     POINTER DRAG
-  ======================================================== */
-
-  let dragging = false;
-  let pointerX = 0;
-
-  window.addEventListener(
-    "pointerdown",
-    (event) => {
-
-      if (
-        event.pointerType !== "mouse" ||
-        event.button !== 0
-      ) {
-        return;
-      }
-
-      if (
-        modal.classList.contains("open") ||
-        systemNav.classList.contains("open")
-      ) {
-        return;
-      }
-
-      dragging = true;
-      pointerX = event.clientX;
-
-      document.body.classList.add("dragging");
-
-    }
-  );
-
-
-  window.addEventListener(
-    "pointermove",
-    (event) => {
-
-      if (!dragging) {
-        return;
-      }
-
-      const delta =
-        pointerX - event.clientX;
-
-      pointerX = event.clientX;
-
-      moveByDelta(delta * 1.5);
-
-    }
-  );
-
-
-  window.addEventListener(
-    "pointerup",
-    () => {
-
-      dragging = false;
-
-      document.body.classList.remove("dragging");
-
-    }
-  );
-
-
-  /* =======================================================
-     INTERFACE UPDATE
-  ======================================================== */
-
-  function updateInterface(progress) {
+function updateInterface() {
 
     const sceneFloat =
-      progress * scenes.length;
+        currentProgress * (sceneCount - 1);
 
-    let index =
-      Math.floor(sceneFloat);
-
-    if (index >= scenes.length) {
-      index = scenes.length - 1;
-    }
-
-    const local =
-      sceneFloat - index;
-
-    if (index !== currentScene) {
-      currentScene = index;
-      updateSceneState(index);
-    }
-
-    const percent =
-      Math.round(progress * 100);
-
-    progressPercent.textContent =
-      `${String(percent).padStart(2, "0")}%`;
-
-    progressFill.style.width =
-      `${percent}%`;
-
-    progressNode.style.left =
-      `${percent}%`;
-
-    sceneNumber.textContent =
-      String(index + 1).padStart(2, "0");
-
-    updateSceneMotion(
-      index,
-      local
-    );
-  }
-
-
-  /* =======================================================
-     SCENE STATE
-  ======================================================== */
-
-  const sceneNames = [
-    "OBJECT DETECTED",
-    "SURVEILLANCE ACTIVE",
-    "ACCESS CONTROL",
-    "RESPONSE READY",
-    "SYSTEM HEALTH",
-    "NETWORK ACTIVE",
-    "CENTRAL NODE",
-    "NEW OBJECT"
-  ];
-
-  const globalNames = [
-    "OBJECT ONLINE",
-    "SURVEILLANCE ACTIVE",
-    "ACCESS VERIFIED",
-    "RESPONSE READY",
-    "SERVICE ACTIVE",
-    "NETWORK ACTIVE",
-    "CONTROL CENTER",
-    "CHANNEL READY"
-  ];
-
-
-  function updateSceneState(index) {
-
-    scenes.forEach((scene, i) => {
-      scene.classList.toggle(
-        "active",
-        i === index
-      );
-    });
-
-    navItems.forEach((item, i) => {
-      item.classList.toggle(
-        "active",
-        i === index
-      );
-    });
-
-    globalStatus.textContent =
-      globalNames[index];
-
-    mobilePosition.textContent =
-      sceneNames[index];
-
-    if (index === 0) {
-      document.getElementById("objectState").textContent =
-        "ONLINE";
-    }
-
-    if (index === 1) {
-      document.getElementById("motionState").textContent =
-        "DETECTED";
-    }
-
-    if (index === 2) {
-      document.getElementById("accessLabel").textContent =
-        "CARD VERIFIED";
-
-      document.getElementById("accessStatus").textContent =
-        "GRANTED";
-    }
-
-    if (index === 3) {
-      document.getElementById("fireNodeState").textContent =
-        "EVENT READY";
-
-      document.getElementById("responseState").textContent =
-        "RESPONSE ACTIVE";
-    }
-
-    if (index === 4) {
-      document.getElementById("maintenanceState").textContent =
-        "RESTORING";
-
-      document.getElementById("healthValue").textContent =
-        "96%";
-
-      document.getElementById("healthBar").style.width =
-        "96%";
-    }
-
-    if (index === 5) {
-      document.getElementById("flowState").textContent =
-        "ACTIVE / 24H";
-    }
-
-    if (index === 6) {
-      document.getElementById("nodeCount").textContent =
-        "018";
-    }
-  }
-
-
-  /* =======================================================
-     SCENE MOTION
-  ======================================================== */
-
-  function updateSceneMotion(index, local) {
-
-    const scene =
-      scenes[index];
-
-    if (!scene) {
-      return;
-    }
-
-    const image =
-      scene.querySelector(".scene-image");
-
-    if (image) {
-
-      const x =
-        (local - .5) * -2;
-
-      const y =
-        Math.sin(local * Math.PI) * -1;
-
-      image.style.transform =
-        `translate3d(${x}%, ${y}%, 0) scale(1.035)`;
-
-    }
-
-
-    if (index === 0) {
-
-      const scan =
-        scene.querySelector(".scan-field");
-
-      if (scan) {
-        scan.style.opacity =
-          local > .03 && local < .97
-            ? "1"
-            : "0";
-      }
-
-    }
-
-
-    if (index === 1) {
-
-      const frame =
-        scene.querySelector(".surveillance-frame");
-
-      if (frame) {
-
-        const scale =
-          .88 + local * .22;
-
-        frame.style.transform =
-          `scale(${scale})`;
-
-      }
-
-    }
-
-
-    if (index === 4) {
-
-      const value =
-        Math.round(
-          72 + local * 25
+    const sceneNumber =
+        Math.min(
+            sceneCount,
+            Math.floor(sceneFloat + .5) + 1
         );
 
-      document.getElementById(
-        "healthValue"
-      ).textContent = `${value}%`;
+    currentScene.textContent =
+        String(sceneNumber).padStart(2, "0");
 
-      document.getElementById(
-        "healthBar"
-      ).style.width = `${value}%`;
+    progressBar.style.width =
+        `${currentProgress * 100}%`;
 
-    }
+    updateDesktopMenu(sceneNumber);
+}
 
-  }
+function updateDesktopMenu(number) {
 
+    document
+        .querySelectorAll(".desktop-menu button")
+        .forEach((button, index) => {
 
-  /* =======================================================
-     NAVIGATION
-  ======================================================== */
-
-  menuButton.addEventListener(
-    "click",
-    () => {
-      systemNav.classList.add("open");
-    }
-  );
-
-
-  navClose.addEventListener(
-    "click",
-    () => {
-      systemNav.classList.remove("open");
-    }
-  );
-
-
-  navItems.forEach(
-    (item) => {
-
-      item.addEventListener(
-        "click",
-        () => {
-
-          const target =
-            Number(
-              item.dataset.target
+            button.classList.toggle(
+                "active",
+                index === number - 1
             );
+        });
+}
 
-          const progress =
-            target /
-            (scenes.length - 1);
 
-          setTargetProgress(progress);
+/* -------------------------------------------------
+   DESKTOP WHEEL
+------------------------------------------------- */
 
-          systemNav.classList.remove("open");
+experience.addEventListener(
+    "wheel",
+    event => {
 
+        if (isMobile()) {
+            return;
         }
-      );
 
+        event.preventDefault();
+
+        const amount =
+            Math.abs(event.deltaY) > Math.abs(event.deltaX)
+                ? event.deltaY
+                : event.deltaX;
+
+        wheelAccumulator += amount;
+
+        const threshold = 20;
+
+        if (Math.abs(wheelAccumulator) >= threshold) {
+
+            moveByPixels(wheelAccumulator * 0.8);
+
+            wheelAccumulator = 0;
+        }
+
+    },
+    { passive: false }
+);
+
+
+/* -------------------------------------------------
+   MOUSE DRAG
+------------------------------------------------- */
+
+experience.addEventListener("pointerdown", event => {
+
+    if (isMobile()) {
+        return;
     }
-  );
 
-
-  /* =======================================================
-     MODAL
-  ======================================================== */
-
-  function openModal() {
-
-    modal.classList.add("open");
-    document.body.classList.add("modal-open");
-
-  }
-
-
-  function closeModal() {
-
-    modal.classList.remove("open");
-    document.body.classList.remove("modal-open");
-
-  }
-
-
-  floatingRequest.addEventListener(
-    "click",
-    openModal
-  );
-
-
-  contactTrigger.addEventListener(
-    "click",
-    openModal
-  );
-
-
-  modalClose.addEventListener(
-    "click",
-    closeModal
-  );
-
-
-  modalBackdrop.addEventListener(
-    "click",
-    closeModal
-  );
-
-
-  document.addEventListener(
-    "keydown",
-    (event) => {
-
-      if (event.key === "Escape") {
-
-        if (modal.classList.contains("open")) {
-          closeModal();
-        }
-
-        if (systemNav.classList.contains("open")) {
-          systemNav.classList.remove("open");
-        }
-
-      }
-
+    if (
+        event.target.closest("button") ||
+        event.target.closest("a") ||
+        event.target.closest("input") ||
+        event.target.closest("textarea")
+    ) {
+        return;
     }
-  );
 
+    dragging = true;
+    dragStartX = event.clientX;
+    dragStartProgress = targetProgress;
 
-  /* =======================================================
-     FORM
-  ======================================================== */
+    experience.classList.add("dragging");
 
-  projectForm.addEventListener(
-    "submit",
-    (event) => {
+    experience.setPointerCapture(event.pointerId);
+});
 
-      event.preventDefault();
+experience.addEventListener("pointermove", event => {
 
-      projectForm.style.display =
-        "none";
-
-      formSuccess.classList.add(
-        "show"
-      );
-
+    if (!dragging) {
+        return;
     }
-  );
+
+    const distance =
+        Math.max(window.innerWidth * (sceneCount - 1), 1);
+
+    const delta =
+        dragStartX - event.clientX;
+
+    setProgress(
+        dragStartProgress + delta / distance
+    );
+});
+
+function stopDragging() {
+
+    dragging = false;
+
+    experience.classList.remove("dragging");
+}
+
+experience.addEventListener("pointerup", stopDragging);
+experience.addEventListener("pointercancel", stopDragging);
+experience.addEventListener("lostpointercapture", stopDragging);
 
 
-  /* =======================================================
-     IMAGE ERROR HANDLING
-  ======================================================== */
+/* -------------------------------------------------
+   MOBILE REAL SWIPE
+------------------------------------------------- */
 
-  document
-    .querySelectorAll("img")
-    .forEach((image) => {
+experience.addEventListener(
+    "touchstart",
+    event => {
 
-      image.addEventListener(
-        "error",
-        () => {
-
-          image.classList.add(
-            "image-missing"
-          );
-
-          console.warn(
-            `SENTRA image not found: ${image.getAttribute("src")}`
-          );
-
+        if (event.touches.length !== 1) {
+            return;
         }
-      );
 
-    });
+        touchStartX = event.touches[0].clientX;
+        touchLastX = touchStartX;
 
+        touchStartProgress = targetProgress;
 
-  /* =======================================================
-     RESIZE
-  ======================================================== */
+    },
+    { passive: true }
+);
 
-  window.addEventListener(
-    "resize",
+experience.addEventListener(
+    "touchmove",
+    event => {
+
+        if (event.touches.length !== 1) {
+            return;
+        }
+
+        const x = event.touches[0].clientX;
+
+        const delta =
+            touchStartX - x;
+
+        const distance =
+            Math.max(window.innerWidth * (sceneCount - 1), 1);
+
+        setProgress(
+            touchStartProgress + delta / distance
+        );
+
+        touchLastX = x;
+
+    },
+    { passive: true }
+);
+
+experience.addEventListener(
+    "touchend",
     () => {
 
-      const p =
-        getProgressFromScroll();
+        const moved =
+            touchStartX - touchLastX;
 
-      targetProgress = p;
-      currentProgress = p;
+        const threshold =
+            window.innerWidth * .08;
 
-      track.style.transform =
-        `translate3d(${-p * window.innerWidth * 7}px, 0, 0)`;
+        if (Math.abs(moved) < threshold) {
+            return;
+        }
 
+        const sceneFloat =
+            targetProgress * (sceneCount - 1);
+
+        let nearest =
+            Math.round(sceneFloat);
+
+        if (moved > 0) {
+            nearest = Math.max(nearest, Math.ceil(sceneFloat));
+        } else {
+            nearest = Math.min(nearest, Math.floor(sceneFloat));
+        }
+
+        goToScene(nearest);
+
+    },
+    { passive: true }
+);
+
+
+/* -------------------------------------------------
+   KEYBOARD
+------------------------------------------------- */
+
+window.addEventListener("keydown", event => {
+
+    if (
+        event.key !== "ArrowRight" &&
+        event.key !== "ArrowLeft"
+    ) {
+        return;
     }
-  );
 
+    event.preventDefault();
 
-  /* =======================================================
-     INITIAL
-  ======================================================== */
+    const current =
+        Math.round(targetProgress * (sceneCount - 1));
 
-  updateSceneState(0);
+    if (event.key === "ArrowRight") {
+        goToScene(current + 1);
+    }
 
+    if (event.key === "ArrowLeft") {
+        goToScene(current - 1);
+    }
 });
+
+
+/* -------------------------------------------------
+   NAVIGATION
+------------------------------------------------- */
+
+document.querySelectorAll("[data-target]").forEach(button => {
+
+    button.addEventListener("click", () => {
+
+        const target =
+            Number(button.dataset.target);
+
+        goToScene(target);
+    });
+});
+
+
+/* -------------------------------------------------
+   MOBILE MENU
+------------------------------------------------- */
+
+function openMobileMenu() {
+    mobileMenu.classList.add("open");
+}
+
+function closeMobileMenu() {
+    mobileMenu.classList.remove("open");
+}
+
+menuButton.addEventListener(
+    "click",
+    openMobileMenu
+);
+
+menuClose.addEventListener(
+    "click",
+    closeMobileMenu
+);
+
+mobileMenu.addEventListener("click", event => {
+
+    const button =
+        event.target.closest("[data-target]");
+
+    if (!button) {
+        return;
+    }
+
+    goToScene(
+        Number(button.dataset.target)
+    );
+});
+
+
+/* -------------------------------------------------
+   MODAL
+------------------------------------------------- */
+
+function openModal() {
+
+    requestModal.classList.add("open");
+
+    formSuccess.style.display = "none";
+    requestForm.style.display = "flex";
+}
+
+function closeModal() {
+
+    requestModal.classList.remove("open");
+}
+
+floatingCta.addEventListener(
+    "click",
+    openModal
+);
+
+openRequest.addEventListener(
+    "click",
+    openModal
+);
+
+modalClose.addEventListener(
+    "click",
+    closeModal
+);
+
+document
+    .querySelector(".modal-backdrop")
+    .addEventListener(
+        "click",
+        closeModal
+    );
+
+document.addEventListener("keydown", event => {
+
+    if (event.key === "Escape") {
+        closeModal();
+        closeMobileMenu();
+    }
+});
+
+
+/* -------------------------------------------------
+   FORM
+------------------------------------------------- */
+
+requestForm.addEventListener(
+    "submit",
+    event => {
+
+        event.preventDefault();
+
+        requestForm.style.display = "none";
+        formSuccess.style.display = "block";
+    }
+);
+
+
+/* -------------------------------------------------
+   IMAGE CHECK
+------------------------------------------------- */
+
+document.querySelectorAll("img").forEach(image => {
+
+    image.addEventListener("error", () => {
+
+        console.warn(
+            `Не удалось загрузить изображение: ${image.src}`
+        );
+
+        image.style.opacity = "0";
+    });
+});
+
+
+/* -------------------------------------------------
+   RESIZE
+------------------------------------------------- */
+
+window.addEventListener("resize", () => {
+
+    const sceneFloat =
+        currentProgress * (sceneCount - 1);
+
+    targetProgress =
+        clamp(sceneFloat / (sceneCount - 1), 0, 1);
+});
+
+
+/* -------------------------------------------------
+   INITIAL STATE
+------------------------------------------------- */
+
+setTimeout(() => {
+    setProgress(0);
+}, 100);
