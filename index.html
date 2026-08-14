@@ -2,9 +2,12 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#080909">
-  <title>SENTRA — система контроля объекта</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070707">
+  <title>SENTRA — объект под контролем</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -14,57 +17,55 @@
   <div class="loader" id="loader">
     <div class="loader-inner">
 
-      <div class="loader-brand">
+      <div class="loader-author">
         <img src="IMG_8735.png" alt="AIKharisov">
       </div>
 
-      <div class="loader-sentra">SENTRA</div>
+      <div class="loader-brand">SENTRA</div>
 
-      <div class="loader-line">
-        <span id="loaderProgress"></span>
+      <div class="loader-status">
+        <span id="loaderStatus">ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ</span>
       </div>
 
-      <div class="loader-status" id="loaderStatus">
-        ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ
+      <div class="loader-progress">
+        <div class="loader-progress-bar" id="loaderProgressBar"></div>
       </div>
 
-      <div class="checks" id="checks">
+      <div class="loader-checks">
 
-        <div class="check">
-          <span class="check-number">01</span>
+        <div class="loader-check" data-check="0">
+          <span class="check-index">01</span>
           <span>ПРОВЕРКА ВИДЕОНАБЛЮДЕНИЯ</span>
           <b>WAIT</b>
         </div>
 
-        <div class="check">
-          <span class="check-number">02</span>
+        <div class="loader-check" data-check="1">
+          <span class="check-index">02</span>
           <span>ПРОВЕРКА ПОЖАРНОЙ БЕЗОПАСНОСТИ</span>
           <b>WAIT</b>
         </div>
 
-        <div class="check">
-          <span class="check-number">03</span>
+        <div class="loader-check" data-check="2">
+          <span class="check-index">03</span>
           <span>ПРОВЕРКА СКУД</span>
           <b>WAIT</b>
         </div>
 
-        <div class="check">
-          <span class="check-number">04</span>
+        <div class="loader-check" data-check="3">
+          <span class="check-index">04</span>
           <span>ПРОВЕРКА СОСТОЯНИЯ ОБЪЕКТА</span>
           <b>WAIT</b>
         </div>
 
-        <div class="check">
-          <span class="check-number">05</span>
+        <div class="loader-check" data-check="4">
+          <span class="check-index">05</span>
           <span>СИНХРОНИЗАЦИЯ ЦЕНТРА КОНТРОЛЯ</span>
           <b>WAIT</b>
         </div>
 
       </div>
 
-      <div class="loader-ready" id="loaderReady">
-        СИСТЕМА ГОТОВА
-      </div>
+      <div class="loader-ready">СИСТЕМА ГОТОВА</div>
 
     </div>
   </div>
@@ -73,10 +74,7 @@
   <!-- HEADER -->
   <header class="header">
 
-    <div class="header-logo">
-      <span>SENTRA</span>
-      <small>CONTROL SYSTEM</small>
-    </div>
+    <div class="header-logo">SENTRA</div>
 
     <a
       class="header-order"
@@ -88,72 +86,73 @@
     </a>
 
     <div class="header-right">
-
-      <div class="system-status">
-        <i></i>
-        <span>СИСТЕМА АКТИВНА</span>
+      <div class="header-status">
+        <span class="status-dot"></span>
+        СИСТЕМА АКТИВНА
       </div>
 
-      <div class="clock" id="clock">00:00:00</div>
+      <div class="header-time" id="clock">00:00:00</div>
 
-      <button class="menu-button" id="menuButton" aria-label="Открыть меню">
+      <button class="menu-button" id="menuButton" aria-label="Открыть навигацию">
         <span></span>
         <span></span>
       </button>
-
     </div>
 
   </header>
 
 
-  <!-- MENU -->
+  <!-- NAVIGATION -->
   <aside class="menu" id="menu">
 
     <div class="menu-head">
       <span>NAVIGATION</span>
-      <button id="menuClose">×</button>
+
+      <button class="menu-close" id="menuClose" aria-label="Закрыть навигацию">
+        ×
+      </button>
     </div>
 
-    <nav class="menu-list">
+    <nav class="menu-nav">
 
-      <button data-scene="0">
-        <strong>01</strong>
-        <span>ОБЪЕКТ ПОД КОНТРОЛЕМ</span>
+      <button class="menu-item active" data-scene="0">
+        <span>01</span>
+        <strong>ОБЪЕКТ ПОД КОНТРОЛЕМ</strong>
       </button>
 
-      <button data-scene="1">
-        <strong>02</strong>
-        <span>СИСТЕМА ВИДИТ</span>
+      <button class="menu-item" data-scene="1">
+        <span>02</span>
+        <strong>СИСТЕМА ВИДИТ</strong>
       </button>
 
-      <button data-scene="2">
-        <strong>03</strong>
-        <span>ИЗМЕНЕНИЕ ОБНАРУЖЕНО</span>
+      <button class="menu-item" data-scene="2">
+        <span>03</span>
+        <strong>ИЗМЕНЕНИЕ ОБНАРУЖЕНО</strong>
       </button>
 
-      <button data-scene="3">
-        <strong>04</strong>
-        <span>ДОСТУП ПРОВЕРЕН</span>
+      <button class="menu-item" data-scene="3">
+        <span>04</span>
+        <strong>ДОСТУП ПРОВЕРЕН</strong>
       </button>
 
-      <button data-scene="4">
-        <strong>05</strong>
-        <span>ОПАСНОСТЬ ОБНАРУЖЕНА</span>
+      <button class="menu-item" data-scene="4">
+        <span>05</span>
+        <strong>ОПАСНОСТЬ ОБНАРУЖЕНА</strong>
       </button>
 
-      <button data-scene="5">
-        <strong>06</strong>
-        <span>СИСТЕМА ДОЛЖНА РАБОТАТЬ</span>
+      <button class="menu-item" data-scene="5">
+        <span>06</span>
+        <strong>СИСТЕМА ДОЛЖНА РАБОТАТЬ</strong>
       </button>
 
-      <button data-scene="6">
-        <strong>07</strong>
-        <span>ВСЁ СВЯЗАНО</span>
+      <button class="menu-item" data-scene="6">
+        <span>07</span>
+        <strong>ВСЁ СВЯЗАНО</strong>
       </button>
 
-      <button data-scene="7">
-        <strong>08</strong>
-        <span>ОБЪЕКТ ГОТОВ К КОНТРОЛЮ</span>
+      <button class="menu-item" data-scene="7">
+        <span>08</span>
+        <strong>ОБЪЕКТ ГОТОВ К КОНТРОЛЮ</strong>
       </button>
 
     </nav>
@@ -173,407 +172,438 @@
   <!-- EXPERIENCE -->
   <main class="experience" id="experience">
 
-    <div class="track" id="track">
+
+    <!-- 01 -->
+    <section class="scene scene-01" data-scene="0">
+
+      <div class="scene-copy">
+
+        <div class="scene-number">01 / 08</div>
+
+        <h1>ОБЪЕКТ<br>ПОД КОНТРОЛЕМ</h1>
+
+        <p>
+          SENTRA начинает с самого объекта.
+          Система видит пространство, фиксирует его состояние
+          и переводит его под постоянный контроль.
+        </p>
+
+        <div class="scene-meta">
+          <span>OBJECT</span>
+          <strong>ONLINE</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage">
+
+        <img src="IMG_8742.png" alt="Объект под контролем">
+
+        <div class="scan-object"></div>
+
+        <div class="object-zone zone-1"></div>
+        <div class="object-zone zone-2"></div>
+        <div class="object-zone zone-3"></div>
+
+        <div class="media-status">
+          <span>OBJECT</span>
+          <b>ONLINE</b>
+        </div>
+
+      </div>
+
+    </section>
 
 
-      <!-- 01 -->
-      <section class="scene scene-01">
+    <!-- 02 -->
+    <section class="scene scene-02" data-scene="1">
 
-        <div class="scene-copy">
+      <div class="scene-copy">
 
-          <div class="scene-meta">
-            <span>01 / 08</span>
-            <span>OBJECT CONTROL</span>
+        <div class="scene-number">02 / 08</div>
+
+        <h1>СИСТЕМА<br>ВИДИТ</h1>
+
+        <p>
+          Камеры контролируют зоны объекта,
+          замечая присутствие и изменения
+          там, где человеческое внимание может пропустить деталь.
+        </p>
+
+        <div class="scene-meta">
+          <span>SURVEILLANCE</span>
+          <strong>SCAN ACTIVE</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage">
+
+        <img src="IMG_8745.png" alt="Система видеонаблюдения">
+
+        <div class="camera-scan"></div>
+
+        <div class="scan-point point-a"></div>
+        <div class="scan-point point-b"></div>
+        <div class="scan-point point-c"></div>
+
+        <div class="scan-complete">SCAN COMPLETE</div>
+
+      </div>
+
+    </section>
+
+
+    <!-- 03 -->
+    <section class="scene scene-03" data-scene="2">
+
+      <div class="scene-copy">
+
+        <div class="scene-number">03 / 08</div>
+
+        <h1>ИЗМЕНЕНИЕ<br>ОБНАРУЖЕНО</h1>
+
+        <p>
+          Система фиксирует изменение в контролируемой зоне,
+          анализирует ситуацию и определяет,
+          требует ли она реакции.
+        </p>
+
+        <div class="scene-meta">
+          <span>MOTION</span>
+          <strong id="detectionState">ANALYZING</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage">
+
+        <img src="IMG_8746.png" alt="Изменение обнаружено">
+
+        <div class="person-target">
+          <span class="target-corner tl"></span>
+          <span class="target-corner tr"></span>
+          <span class="target-corner bl"></span>
+          <span class="target-corner br"></span>
+        </div>
+
+        <div class="person-scan"></div>
+
+        <div class="detection-label">
+          <span>MOTION</span>
+          <b>DETECTED</b>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- 04 -->
+    <section class="scene scene-04" data-scene="3">
+
+      <div class="scene-copy">
+
+        <div class="scene-number">04 / 08</div>
+
+        <h1>ДОСТУП<br>ПРОВЕРЕН</h1>
+
+        <p>
+          Каждое обращение к объекту проходит проверку.
+          Система подтверждает право доступа
+          до открытия двери.
+        </p>
+
+        <div class="scene-meta">
+          <span>ACCESS CONTROL</span>
+          <strong>GRANTED</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage">
+
+        <img src="IMG_8744.png" alt="Проверка доступа">
+
+        <div class="access-pulse">
+          <span></span>
+          <i></i>
+          <b></b>
+        </div>
+
+        <div class="access-label">
+          <span>VERIFYING</span>
+          <strong>ACCESS GRANTED</strong>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- 05 -->
+    <section class="scene scene-05" data-scene="4">
+
+      <div class="scene-copy">
+
+        <div class="scene-number">05 / 08</div>
+
+        <h1>ОПАСНОСТЬ<br>ОБНАРУЖЕНА</h1>
+
+        <p>
+          Когда система фиксирует угрозу,
+          она не просто сообщает о ней.
+          SENTRA переводит событие в состояние,
+          требующее реакции.
+        </p>
+
+        <div class="scene-meta">
+          <span>FIRE SAFETY</span>
+          <strong>THREAT DETECTED</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage">
+
+        <img src="IMG_8752.png" alt="Система пожарной безопасности">
+
+        <div class="threat-frame"></div>
+
+        <div class="threat-pulse"></div>
+
+        <div class="threat-label">
+          <span>FIRE SYSTEM</span>
+          <strong>THREAT DETECTED</strong>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- 06 -->
+    <section class="scene scene-06" data-scene="5">
+
+      <div class="scene-copy">
+
+        <div class="scene-number">06 / 08</div>
+
+        <h1>СИСТЕМА<br>ДОЛЖНА РАБОТАТЬ</h1>
+
+        <p>
+          Надёжность системы начинается с обслуживания.
+          Специалист проверяет оборудование,
+          соединения и состояние каждого узла.
+        </p>
+
+        <div class="scene-meta">
+          <span>SERVICE</span>
+          <strong id="serviceState">SYSTEM CHECK</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage">
+
+        <img src="IMG_8753.png" alt="Обслуживание систем безопасности">
+
+        <div class="service-checks">
+
+          <div class="service-check" data-service="0">
+            <span>POWER</span>
+            <b>OK</b>
           </div>
 
-          <h1>ОБЪЕКТ<br><em>ПОД КОНТРОЛЕМ</em></h1>
+          <div class="service-check" data-service="1">
+            <span>LINK</span>
+            <b>OK</b>
+          </div>
 
-          <p>
-            SENTRA объединяет системы безопасности объекта
-            в единую контролируемую среду.
-          </p>
+          <div class="service-check" data-service="2">
+            <span>ALARM</span>
+            <b>OK</b>
+          </div>
 
-          <div class="scene-state">
-            <i></i>
-            OBJECT / ONLINE
+          <div class="service-check" data-service="3">
+            <span>SENSORS</span>
+            <b>OK</b>
+          </div>
+
+          <div class="service-check" data-service="4">
+            <span>CONTROL</span>
+            <b>OK</b>
           </div>
 
         </div>
 
-        <div class="media-stage">
-
-          <img src="IMG_8742.png" alt="Объект под контролем">
-
-          <div class="object-scan"></div>
-
-          <div class="object-point point-1"></div>
-          <div class="object-point point-2"></div>
-          <div class="object-point point-3"></div>
-
-          <div class="media-status">OBJECT / ONLINE</div>
-
+        <div class="service-complete">
+          SYSTEM CHECK COMPLETE
         </div>
 
-      </section>
+      </div>
+
+    </section>
 
 
-      <!-- 02 -->
-      <section class="scene scene-02">
+    <!-- 07 -->
+    <section class="scene scene-07" data-scene="6">
 
-        <div class="scene-copy">
+      <div class="scene-copy">
 
-          <div class="scene-meta">
-            <span>02 / 08</span>
+        <div class="scene-number">07 / 08</div>
+
+        <h1>ВСЁ<br>СВЯЗАНО</h1>
+
+        <p>
+          Видеонаблюдение, пожарная безопасность,
+          доступ и обслуживание работают
+          как единая система контроля.
+        </p>
+
+        <div class="scene-meta">
+          <span>CONTROL CENTER</span>
+          <strong>ALL SYSTEMS ONLINE</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage network-stage">
+
+        <img src="IMG_8749.png" alt="Центр контроля">
+
+        <div class="network-overlay"></div>
+
+        <div class="network-node node-cctv">
+          <span>CCTV</span>
+          <i></i>
+        </div>
+
+        <div class="network-node node-fire">
+          <span>FIRE</span>
+          <i></i>
+        </div>
+
+        <div class="network-node node-access">
+          <span>ACCESS</span>
+          <i></i>
+        </div>
+
+        <div class="network-node node-service">
+          <span>SERVICE</span>
+          <i></i>
+        </div>
+
+        <div class="network-center">
+          <span>SENTRA</span>
+          <b>CONTROL CENTER</b>
+        </div>
+
+        <svg class="network-lines" viewBox="0 0 1000 625" preserveAspectRatio="none">
+          <line class="network-line line-cctv" x1="16%" y1="15%" x2="50%" y2="50%"/>
+          <line class="network-line line-fire" x1="84%" y1="15%" x2="50%" y2="50%"/>
+          <line class="network-line line-access" x1="16%" y1="85%" x2="50%" y2="50%"/>
+          <line class="network-line line-service" x1="84%" y1="85%" x2="50%" y2="50%"/>
+        </svg>
+
+        <div class="network-signal signal-cctv"></div>
+        <div class="network-signal signal-fire"></div>
+        <div class="network-signal signal-access"></div>
+        <div class="network-signal signal-service"></div>
+
+        <div class="network-complete">ALL SYSTEMS ONLINE</div>
+
+      </div>
+
+    </section>
+
+
+    <!-- 08 -->
+    <section class="scene scene-08" data-scene="7">
+
+      <div class="scene-copy">
+
+        <div class="scene-number">08 / 08</div>
+
+        <h1>ОБЪЕКТ<br>ГОТОВ К КОНТРОЛЮ</h1>
+
+        <p>
+          Все системы проверены.
+          Объект находится в нормальном состоянии
+          и готов к постоянному контролю.
+        </p>
+
+        <div class="scene-meta">
+          <span>OBJECT STATUS</span>
+          <strong>READY</strong>
+        </div>
+
+      </div>
+
+      <div class="media-stage final-stage">
+
+        <img src="IMG_8742.png" alt="Объект готов к контролю">
+
+        <div class="final-checks">
+
+          <div class="final-check" data-final="0">
             <span>VIDEO SURVEILLANCE</span>
+            <b>READY</b>
           </div>
 
-          <h1>СИСТЕМА<br><em>ВИДИТ</em></h1>
-
-          <p>
-            Камеры фиксируют пространство и передают
-            состояние контролируемой зоны в систему.
-          </p>
-
-          <div class="scene-state">
-            <i></i>
-            SCAN ACTIVE
+          <div class="final-check" data-final="1">
+            <span>FIRE SAFETY</span>
+            <b>READY</b>
           </div>
 
-        </div>
-
-        <div class="media-stage">
-
-          <img src="IMG_8745.png" alt="Видеонаблюдение">
-
-          <div class="scan-beam"></div>
-          <div class="scan-trail"></div>
-
-          <div class="scan-point scan-point-1"></div>
-          <div class="scan-point scan-point-2"></div>
-          <div class="scan-point scan-point-3"></div>
-
-          <div class="media-status">SCAN / ACTIVE</div>
-
-        </div>
-
-      </section>
-
-
-      <!-- 03 -->
-      <section class="scene scene-03">
-
-        <div class="scene-copy">
-
-          <div class="scene-meta">
-            <span>03 / 08</span>
-            <span>MOTION ANALYSIS</span>
-          </div>
-
-          <h1>ИЗМЕНЕНИЕ<br><em>ОБНАРУЖЕНО</em></h1>
-
-          <p>
-            Система замечает изменение в контролируемой зоне
-            и анализирует событие до принятия решения.
-          </p>
-
-          <div class="scene-state">
-            <i></i>
-            MOTION / DETECTED
-          </div>
-
-        </div>
-
-        <div class="media-stage">
-
-          <img src="IMG_8746.png" alt="Обнаружено изменение">
-
-          <div class="target-frame">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-
-          <div class="person-scan"></div>
-
-          <div class="detection-label">
-            <span>ANALYZING</span>
-            <b>DETECTED</b>
-          </div>
-
-          <div class="media-status">MOTION / DETECTED</div>
-
-        </div>
-
-      </section>
-
-
-      <!-- 04 -->
-      <section class="scene scene-04">
-
-        <div class="scene-copy">
-
-          <div class="scene-meta">
-            <span>04 / 08</span>
+          <div class="final-check" data-final="2">
             <span>ACCESS CONTROL</span>
+            <b>READY</b>
           </div>
 
-          <h1>ДОСТУП<br><em>ПРОВЕРЕН</em></h1>
-
-          <p>
-            Система проверяет доступ и фиксирует результат
-            непосредственно в момент прохода.
-          </p>
-
-          <div class="scene-state gold">
-            <i></i>
-            ACCESS / GRANTED
+          <div class="final-check" data-final="3">
+            <span>SYSTEM MAINTENANCE</span>
+            <b>READY</b>
           </div>
 
-        </div>
-
-        <div class="media-stage">
-
-          <img src="IMG_8744.png" alt="Контроль доступа">
-
-          <div class="reader-pulse">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-
-          <div class="access-flash"></div>
-
-          <div class="media-status gold-status">
-            ACCESS / GRANTED
+          <div class="final-check final-normal" data-final="4">
+            <span>OBJECT STATUS</span>
+            <b>NORMAL</b>
           </div>
 
         </div>
 
-      </section>
-
-
-      <!-- 05 -->
-      <section class="scene scene-05">
-
-        <div class="scene-copy">
-
-          <div class="scene-meta">
-            <span>05 / 08</span>
-            <span>FIRE SECURITY</span>
-          </div>
-
-          <h1>ОПАСНОСТЬ<br><em>ОБНАРУЖЕНА</em></h1>
-
-          <p>
-            Система фиксирует критическое изменение,
-            передаёт сигнал и запускает необходимую реакцию.
-          </p>
-
-          <div class="scene-state warning">
-            <i></i>
-            THREAT / DETECTED
-          </div>
-
+        <div class="object-ready">
+          <span>OBJECT</span>
+          <strong>READY</strong>
+          <small>SENTRA CONTROL SYSTEM / ONLINE</small>
         </div>
 
-        <div class="media-stage">
+      </div>
 
-          <img src="IMG_8752.png" alt="Пожарная безопасность">
+    </section>
 
-          <div class="danger-frame"></div>
-          <div class="danger-pulse"></div>
-
-          <div class="danger-label">
-            THREAT DETECTED
-          </div>
-
-          <div class="media-status warning-status">
-            THREAT / DETECTED
-          </div>
-
-        </div>
-
-      </section>
-
-
-      <!-- 06 -->
-      <section class="scene scene-06">
-
-        <div class="scene-copy">
-
-          <div class="scene-meta">
-            <span>06 / 08</span>
-            <span>SERVICE</span>
-          </div>
-
-          <h1>СИСТЕМА<br><em>ДОЛЖНА РАБОТАТЬ</em></h1>
-
-          <p>
-            Обслуживание поддерживает оборудование в рабочем
-            состоянии и предотвращает отказ системы.
-          </p>
-
-          <div class="scene-state">
-            <i></i>
-            SYSTEM / CHECK
-          </div>
-
-        </div>
-
-        <div class="media-stage">
-
-          <img src="IMG_8753.png" alt="Техническое обслуживание">
-
-          <div class="service-line"></div>
-
-          <div class="service-points">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-
-          <div class="media-status">
-            SYSTEM / CHECK COMPLETE
-          </div>
-
-        </div>
-
-      </section>
-
-
-      <!-- 07 -->
-      <section class="scene scene-07">
-
-        <div class="scene-copy">
-
-          <div class="scene-meta">
-            <span>07 / 08</span>
-            <span>CENTRAL CONTROL</span>
-          </div>
-
-          <h1>ВСЁ<br><em>СВЯЗАНО</em></h1>
-
-          <p>
-            Видеонаблюдение, пожарная безопасность,
-            СКУД и обслуживание объединены в один контур.
-          </p>
-
-          <div class="scene-state">
-            <i></i>
-            ALL SYSTEMS / ONLINE
-          </div>
-
-        </div>
-
-        <div class="media-stage network-stage">
-
-          <img src="IMG_8749.png" alt="Центр контроля">
-
-          <div class="network-overlay">
-
-            <svg viewBox="0 0 1000 625" preserveAspectRatio="none">
-
-              <line class="network-line line-1" x1="17" y1="28" x2="50" y2="50"/>
-              <line class="network-line line-2" x1="78" y1="25" x2="50" y2="50"/>
-              <line class="network-line line-3" x1="18" y1="78" x2="50" y2="50"/>
-              <line class="network-line line-4" x1="80" y1="78" x2="50" y2="50"/>
-
-            </svg>
-
-            <div class="network-node node-1"></div>
-            <div class="network-node node-2"></div>
-            <div class="network-node node-3"></div>
-            <div class="network-node node-4"></div>
-
-            <div class="network-center"></div>
-
-          </div>
-
-          <div class="network-label">
-            ALL SYSTEMS ONLINE
-          </div>
-
-          <div class="media-status">
-            CENTRAL / ONLINE
-          </div>
-
-        </div>
-
-      </section>
-
-
-      <!-- 08 -->
-      <section class="scene scene-08">
-
-        <div class="scene-copy">
-
-          <div class="scene-meta">
-            <span>08 / 08</span>
-            <span>CONTROL READY</span>
-          </div>
-
-          <h1>ОБЪЕКТ ГОТОВ<br><em>К КОНТРОЛЮ</em></h1>
-
-          <p>
-            Единая система контроля объекта готова
-            работать в постоянном режиме.
-          </p>
-
-          <div class="scene-state ready">
-            <i></i>
-            SYSTEM / READY
-          </div>
-
-          <a
-            class="final-order"
-            href="https://vk.ru/id_aikharisov"
-            target="_blank"
-            rel="noopener"
-          >
-            ЗАКАЗАТЬ САЙТ
-          </a>
-
-        </div>
-
-        <div class="media-stage final-stage">
-
-          <img src="IMG_8760.png" alt="Объект готов к контролю">
-
-          <div class="ready-line"></div>
-          <div class="ready-pulse"></div>
-
-          <div class="media-status">
-            SYSTEM / READY
-          </div>
-
-        </div>
-
-      </section>
-
-    </div>
   </main>
 
 
   <!-- PROGRESS -->
   <div class="progress">
 
-    <div class="progress-numbers">
-      <span id="currentScene">01</span>
-      <span>/</span>
-      <span>08</span>
-    </div>
+    <span class="progress-current" id="progressCurrent">01</span>
 
     <div class="progress-line">
-      <span id="progressBar"></span>
+      <span id="progressFill"></span>
     </div>
 
+    <span>08</span>
+
   </div>
 
 
-  <div class="fiction">
+  <div class="fiction-note">
     Вымышленный проект. Все совпадения случайны.
   </div>
+
 
   <script src="script.js"></script>
 
