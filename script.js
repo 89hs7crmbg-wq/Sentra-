@@ -1,36 +1,75 @@
 (() => {
   "use strict";
 
-  const experience = document.getElementById("experience");
-  const scenes = [...document.querySelectorAll(".scene")];
 
-  const loader = document.getElementById("loader");
-  const loaderProgress = document.getElementById("loaderProgress");
-  const loaderProgressBar = document.getElementById("loaderProgressBar");
-  const loaderReady = document.getElementById("loaderReady");
-  const loaderChecks = [...document.querySelectorAll(".loader-check")];
+  /* =========================================
+     ELEMENTS
+  ========================================= */
 
-  const currentSceneEl = document.getElementById("currentScene");
-  const progressBar = document.getElementById("progressBar");
-  const clock = document.getElementById("clock");
+  const experience =
+    document.getElementById("experience");
 
-  const menu = document.getElementById("menu");
-  const menuButton = document.getElementById("menuButton");
-  const menuScenes = [...document.querySelectorAll(".menu-scene")];
+  const scenes =
+    [...document.querySelectorAll(".scene")];
 
-  const totalScenes = scenes.length;
+  const loader =
+    document.getElementById("loader");
+
+  const loaderProgress =
+    document.getElementById("loaderProgress");
+
+  const loaderProgressBar =
+    document.getElementById("loaderProgressBar");
+
+  const loaderReady =
+    document.getElementById("loaderReady");
+
+  const loaderChecks =
+    [...document.querySelectorAll(".loader-check")];
+
+  const currentSceneEl =
+    document.getElementById("currentScene");
+
+  const progressBar =
+    document.getElementById("progressBar");
+
+  const clock =
+    document.getElementById("clock");
+
+  const menu =
+    document.getElementById("menu");
+
+  const menuButton =
+    document.getElementById("menuButton");
+
+  const menuScenes =
+    [...document.querySelectorAll(".menu-scene")];
+
+
+  /* =========================================
+     STATE
+  ========================================= */
+
+  const totalScenes =
+    scenes.length;
 
   let currentScene = 0;
-  let isMoving = false;
-  let pointerDown = false;
-  let pointerStartX = 0;
-  let pointerStartTranslate = 0;
+
   let currentTranslate = 0;
-  let targetTranslate = 0;
-  let lastSceneSound = -1;
+
+  let isDragging = false;
+
+  let dragStartX = 0;
+
+  let dragStartTranslate = 0;
+
+  let wheelTimeout = null;
 
   let audioContext = null;
+
   let audioUnlocked = false;
+
+  let lastSceneSound = -1;
 
 
   /* =========================================
@@ -38,25 +77,37 @@
   ========================================= */
 
   function initAudio() {
-    if (audioContext) return audioContext;
+
+    if (audioContext) {
+      return audioContext;
+    }
 
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
-      if (!AudioCtx) {
+      const AudioContext =
+        window.AudioContext ||
+        window.webkitAudioContext;
+
+      if (!AudioContext) {
         return null;
       }
 
-      audioContext = new AudioCtx();
+      audioContext =
+        new AudioContext();
+
       return audioContext;
+
     } catch (error) {
+
       return null;
     }
   }
 
 
   function unlockAudio() {
-    const ctx = initAudio();
+
+    const ctx =
+      initAudio();
 
     if (!ctx) {
       return;
@@ -78,22 +129,37 @@
     delay = 0
   } = {}) {
 
-    const ctx = initAudio();
+    const ctx =
+      initAudio();
 
     if (!ctx || !audioUnlocked) {
       return;
     }
 
     try {
-      const now = ctx.currentTime + delay;
 
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const now =
+        ctx.currentTime + delay;
 
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(frequency, now);
+      const oscillator =
+        ctx.createOscillator();
 
-      gain.gain.setValueAtTime(0.0001, now);
+      const gain =
+        ctx.createGain();
+
+      oscillator.type =
+        type;
+
+      oscillator.frequency.setValueAtTime(
+        frequency,
+        now
+      );
+
+      gain.gain.setValueAtTime(
+        0.0001,
+        now
+      );
+
       gain.gain.exponentialRampToValueAtTime(
         Math.max(volume, 0.0002),
         now + 0.012
@@ -108,14 +174,17 @@
       gain.connect(ctx.destination);
 
       oscillator.start(now);
-      oscillator.stop(now + duration + 0.025);
-    } catch (error) {
-      // Audio is decorative. Navigation must never depend on it.
-    }
+
+      oscillator.stop(
+        now + duration + 0.025
+      );
+
+    } catch (error) {}
   }
 
 
   function soundClick() {
+
     createTone({
       frequency: 760,
       duration: 0.045,
@@ -126,6 +195,7 @@
 
 
   function soundScan() {
+
     createTone({
       frequency: 390,
       duration: 0.07,
@@ -144,6 +214,7 @@
 
 
   function soundDetection() {
+
     createTone({
       frequency: 170,
       duration: 0.22,
@@ -170,6 +241,7 @@
 
 
   function soundAccess() {
+
     createTone({
       frequency: 620,
       duration: 0.06,
@@ -188,6 +260,7 @@
 
 
   function soundWarning() {
+
     createTone({
       frequency: 120,
       duration: 0.3,
@@ -206,6 +279,7 @@
 
 
   function soundService() {
+
     createTone({
       frequency: 280,
       duration: 0.045,
@@ -232,6 +306,7 @@
 
 
   function soundNetwork() {
+
     createTone({
       frequency: 310,
       duration: 0.07,
@@ -258,6 +333,7 @@
 
 
   function soundReady() {
+
     createTone({
       frequency: 420,
       duration: 0.08,
@@ -284,6 +360,7 @@
 
 
   function playSceneSound(index) {
+
     unlockAudio();
 
     if (lastSceneSound === index) {
@@ -293,7 +370,9 @@
     lastSceneSound = index;
 
     window.setTimeout(() => {
+
       switch (index) {
+
         case 0:
           soundClick();
           break;
@@ -326,6 +405,7 @@
           soundReady();
           break;
       }
+
     }, 80);
   }
 
@@ -335,98 +415,153 @@
   ========================================= */
 
   function updateClock() {
-    if (!clock) return;
 
-    const now = new Date();
+    if (!clock) {
+      return;
+    }
 
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
-    const seconds = String(now.getSeconds()).padStart(2, "0");
+    const now =
+      new Date();
 
-    clock.textContent = `${hours}:${minutes}:${seconds}`;
+    const hours =
+      String(now.getHours())
+        .padStart(2, "0");
+
+    const minutes =
+      String(now.getMinutes())
+        .padStart(2, "0");
+
+    const seconds =
+      String(now.getSeconds())
+        .padStart(2, "0");
+
+    clock.textContent =
+      `${hours}:${minutes}:${seconds}`;
   }
 
   updateClock();
-  window.setInterval(updateClock, 1000);
+
+  window.setInterval(
+    updateClock,
+    1000
+  );
 
 
   /* =========================================
-     SCENE STATE
+     SCENE POSITION
   ========================================= */
 
-  function setSceneActive(index) {
-    scenes.forEach((scene, sceneIndex) => {
-      scene.classList.toggle("is-active", sceneIndex === index);
-    });
+  function getSceneTranslate(index) {
+
+    return -(
+      index *
+      window.innerWidth
+    );
+  }
+
+
+  function updateSceneUI(index) {
 
     currentScene = index;
 
     if (currentSceneEl) {
-      currentSceneEl.textContent = String(index + 1).padStart(2, "0");
+
+      currentSceneEl.textContent =
+        String(index + 1)
+          .padStart(2, "0");
     }
 
     if (progressBar) {
-      const percentage =
-        ((index + 1) / totalScenes) * 100;
 
-      progressBar.style.width = `${percentage}%`;
+      progressBar.style.width =
+        `${((index + 1) / totalScenes) * 100}%`;
     }
 
-    menuScenes.forEach((item, itemIndex) => {
-      item.classList.toggle("is-current", itemIndex === index);
-    });
+    menuScenes.forEach(
+      (item, itemIndex) => {
+
+        item.classList.toggle(
+          "is-current",
+          itemIndex === index
+        );
+
+      }
+    );
+  }
+
+
+  function activateScene(index) {
+
+    scenes.forEach(
+      (scene, sceneIndex) => {
+
+        scene.classList.toggle(
+          "is-active",
+          sceneIndex === index
+        );
+
+      }
+    );
+
+    updateSceneUI(index);
 
     playSceneSound(index);
   }
 
 
-  /* =========================================
-     TRANSLATION
-  ========================================= */
+  function setTranslate(value) {
 
-  function getTranslateForScene(index) {
-    return -(index * window.innerWidth);
-  }
-
-
-  function applyTransform(value) {
-    currentTranslate = value;
+    currentTranslate =
+      value;
 
     experience.style.transform =
       `translate3d(${value}px, 0, 0)`;
   }
 
 
-  function goToScene(index, force = false) {
-    index = Math.max(
-      0,
-      Math.min(totalScenes - 1, index)
-    );
+  /* =========================================
+     MAIN NAVIGATION
+  ========================================= */
 
-    if (isMoving && !force) {
-      return;
-    }
+  function goToScene(index) {
 
-    if (index === currentScene && !force) {
-      return;
-    }
+    const nextIndex =
+      Math.max(
+        0,
+        Math.min(
+          totalScenes - 1,
+          index
+        )
+      );
 
-    isMoving = true;
+    const nextTranslate =
+      getSceneTranslate(nextIndex);
 
-    currentScene = index;
-    targetTranslate = getTranslateForScene(index);
+    currentScene =
+      nextIndex;
 
     experience.style.transition =
-      "transform 850ms cubic-bezier(.22,.61,.36,1)";
+      "transform 780ms cubic-bezier(.22,.61,.36,1)";
 
-    applyTransform(targetTranslate);
+    setTranslate(
+      nextTranslate
+    );
 
-    setSceneActive(index);
+    activateScene(
+      nextIndex
+    );
 
-    window.setTimeout(() => {
-      isMoving = false;
-      experience.style.transition = "";
-    }, 870);
+    window.clearTimeout(
+      goToScene.transitionTimer
+    );
+
+    goToScene.transitionTimer =
+      window.setTimeout(() => {
+
+        experience.style.transition =
+          "";
+
+      }, 820);
   }
 
 
@@ -434,146 +569,209 @@
      WHEEL / TRACKPAD
   ========================================= */
 
-  let wheelLocked = false;
-  let wheelAccumulator = 0;
-
   function handleWheel(event) {
-    event.preventDefault();
 
-    if (menu.classList.contains("is-open")) {
+    if (
+      menu.classList.contains("is-open")
+    ) {
       return;
     }
 
-    wheelAccumulator +=
-      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+    event.preventDefault();
+
+    unlockAudio();
+
+    if (wheelTimeout) {
+      return;
+    }
+
+    const delta =
+      Math.abs(event.deltaX) >
+      Math.abs(event.deltaY)
         ? event.deltaX
         : event.deltaY;
 
-    if (wheelLocked) {
-      return;
-    }
-
-    if (Math.abs(wheelAccumulator) < 18) {
+    if (Math.abs(delta) < 4) {
       return;
     }
 
     const direction =
-      wheelAccumulator > 0 ? 1 : -1;
+      delta > 0
+        ? 1
+        : -1;
 
-    wheelAccumulator = 0;
-    wheelLocked = true;
+    goToScene(
+      currentScene + direction
+    );
 
-    goToScene(currentScene + direction, true);
+    wheelTimeout =
+      window.setTimeout(() => {
 
-    window.setTimeout(() => {
-      wheelLocked = false;
-    }, 900);
+        wheelTimeout = null;
+
+      }, 650);
   }
 
-  experience.addEventListener(
+
+  window.addEventListener(
     "wheel",
     handleWheel,
-    { passive: false }
+    {
+      passive: false
+    }
   );
 
 
   /* =========================================
-     POINTER DRAG
+     MOUSE / TOUCH DRAG
   ========================================= */
 
-  function handlePointerDown(event) {
-    if (menu.classList.contains("is-open")) {
+  function pointerDown(event) {
+
+    if (
+      menu.classList.contains("is-open")
+    ) {
       return;
     }
 
-    pointerDown = true;
-    pointerStartX = event.clientX;
-    pointerStartTranslate = currentTranslate;
+    isDragging = true;
 
-    experience.classList.add("is-dragging");
+    dragStartX =
+      event.clientX;
 
-    experience.style.transition = "";
+    dragStartTranslate =
+      currentTranslate;
+
+    experience.classList.add(
+      "is-dragging"
+    );
+
+    experience.style.transition =
+      "none";
 
     unlockAudio();
 
     try {
-      experience.setPointerCapture(event.pointerId);
+
+      experience.setPointerCapture(
+        event.pointerId
+      );
+
     } catch (error) {}
   }
 
 
-  function handlePointerMove(event) {
-    if (!pointerDown) {
+  function pointerMove(event) {
+
+    if (!isDragging) {
       return;
     }
 
-    const delta = event.clientX - pointerStartX;
-
-    let next = pointerStartTranslate + delta;
+    const delta =
+      event.clientX -
+      dragStartX;
 
     const minTranslate =
-      -((totalScenes - 1) * window.innerWidth);
+      -(
+        (totalScenes - 1) *
+        window.innerWidth
+      );
 
-    next = Math.max(
-      minTranslate,
-      Math.min(0, next)
-    );
+    let next =
+      dragStartTranslate +
+      delta;
 
-    applyTransform(next);
+    next =
+      Math.max(
+        minTranslate,
+        Math.min(
+          0,
+          next
+        )
+      );
+
+    setTranslate(next);
   }
 
 
-  function handlePointerUp(event) {
-    if (!pointerDown) {
+  function pointerUp(event) {
+
+    if (!isDragging) {
       return;
     }
 
-    pointerDown = false;
+    isDragging = false;
 
-    experience.classList.remove("is-dragging");
+    experience.classList.remove(
+      "is-dragging"
+    );
 
     try {
-      experience.releasePointerCapture(event.pointerId);
+
+      experience.releasePointerCapture(
+        event.pointerId
+      );
+
     } catch (error) {}
 
-    const moved =
-      currentTranslate - pointerStartTranslate;
+    const delta =
+      currentTranslate -
+      dragStartTranslate;
 
     const threshold =
-      Math.min(130, window.innerWidth * 0.18);
+      Math.max(
+        45,
+        Math.min(
+          150,
+          window.innerWidth * 0.16
+        )
+      );
 
-    if (Math.abs(moved) > threshold) {
+    if (
+      Math.abs(delta) >
+      threshold
+    ) {
 
-      if (moved < 0) {
-        goToScene(currentScene + 1, true);
+      if (delta < 0) {
+
+        goToScene(
+          currentScene + 1
+        );
+
       } else {
-        goToScene(currentScene - 1, true);
+
+        goToScene(
+          currentScene - 1
+        );
       }
 
-    } else {
-      goToScene(currentScene, true);
+      return;
     }
+
+    goToScene(
+      currentScene
+    );
   }
 
 
   experience.addEventListener(
     "pointerdown",
-    handlePointerDown
+    pointerDown
   );
 
   experience.addEventListener(
     "pointermove",
-    handlePointerMove
+    pointerMove
   );
 
   experience.addEventListener(
     "pointerup",
-    handlePointerUp
+    pointerUp
   );
 
   experience.addEventListener(
     "pointercancel",
-    handlePointerUp
+    pointerUp
   );
 
 
@@ -581,66 +779,107 @@
      KEYBOARD
   ========================================= */
 
-  document.addEventListener("keydown", (event) => {
+  document.addEventListener(
+    "keydown",
+    (event) => {
 
-    unlockAudio();
+      unlockAudio();
 
-    if (event.key === "Escape") {
-      closeMenu();
-      return;
+      if (
+        event.key === "Escape"
+      ) {
+
+        closeMenu();
+
+        return;
+      }
+
+      if (
+        menu.classList.contains("is-open")
+      ) {
+        return;
+      }
+
+      if (
+        event.key === "ArrowRight" ||
+        event.key === "ArrowDown" ||
+        event.key === " "
+      ) {
+
+        event.preventDefault();
+
+        goToScene(
+          currentScene + 1
+        );
+      }
+
+      if (
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowUp"
+      ) {
+
+        event.preventDefault();
+
+        goToScene(
+          currentScene - 1
+        );
+      }
+
+      if (
+        event.key === "Home"
+      ) {
+
+        event.preventDefault();
+
+        goToScene(0);
+      }
+
+      if (
+        event.key === "End"
+      ) {
+
+        event.preventDefault();
+
+        goToScene(
+          totalScenes - 1
+        );
+      }
+
     }
-
-    if (menu.classList.contains("is-open")) {
-      return;
-    }
-
-    if (
-      event.key === "ArrowRight" ||
-      event.key === "ArrowDown" ||
-      event.key === " "
-    ) {
-      event.preventDefault();
-      goToScene(currentScene + 1);
-    }
-
-    if (
-      event.key === "ArrowLeft" ||
-      event.key === "ArrowUp"
-    ) {
-      event.preventDefault();
-      goToScene(currentScene - 1);
-    }
-
-    if (event.key === "Home") {
-      event.preventDefault();
-      goToScene(0, true);
-    }
-
-    if (event.key === "End") {
-      event.preventDefault();
-      goToScene(totalScenes - 1, true);
-    }
-  });
+  );
 
 
   /* =========================================
      RESIZE
   ========================================= */
 
-  window.addEventListener("resize", () => {
-    currentTranslate =
-      getTranslateForScene(currentScene);
+  window.addEventListener(
+    "resize",
+    () => {
 
-    targetTranslate = currentTranslate;
+      const translate =
+        getSceneTranslate(
+          currentScene
+        );
 
-    experience.style.transition = "none";
+      experience.style.transition =
+        "none";
 
-    applyTransform(currentTranslate);
+      setTranslate(
+        translate
+      );
 
-    window.requestAnimationFrame(() => {
-      experience.style.transition = "";
-    });
-  });
+      window.requestAnimationFrame(
+        () => {
+
+          experience.style.transition =
+            "";
+
+        }
+      );
+
+    }
+  );
 
 
   /* =========================================
@@ -648,113 +887,181 @@
   ========================================= */
 
   function openMenu() {
-    menu.classList.add("is-open");
-    menuButton.classList.add("is-open");
-    document.body.classList.add("menu-open");
+
+    unlockAudio();
+
+    menu.classList.add(
+      "is-open"
+    );
+
+    menuButton.classList.add(
+      "is-open"
+    );
 
     soundClick();
   }
 
 
   function closeMenu() {
-    menu.classList.remove("is-open");
-    menuButton.classList.remove("is-open");
-    document.body.classList.remove("menu-open");
+
+    menu.classList.remove(
+      "is-open"
+    );
+
+    menuButton.classList.remove(
+      "is-open"
+    );
   }
 
 
-  menuButton.addEventListener("click", () => {
-    unlockAudio();
-
-    if (menu.classList.contains("is-open")) {
-      closeMenu();
-    } else {
-      openMenu();
-    }
-  });
-
-
-  menuScenes.forEach((item) => {
-    item.addEventListener("click", () => {
+  menuButton.addEventListener(
+    "click",
+    () => {
 
       unlockAudio();
 
-      const index =
-        Number(item.dataset.scene);
+      if (
+        menu.classList.contains("is-open")
+      ) {
 
-      closeMenu();
+        closeMenu();
 
-      window.setTimeout(() => {
-        goToScene(index, true);
-      }, 100);
-    });
-  });
+      } else {
+
+        openMenu();
+      }
+
+    }
+  );
+
+
+  menuScenes.forEach(
+    (item) => {
+
+      item.addEventListener(
+        "click",
+        () => {
+
+          unlockAudio();
+
+          const index =
+            Number(
+              item.dataset.scene
+            );
+
+          closeMenu();
+
+          window.setTimeout(
+            () => {
+
+              goToScene(index);
+
+            },
+            100
+          );
+
+        }
+      );
+
+    }
+  );
 
 
   /* =========================================
-     NATURAL AUDIO UNLOCK
+     AUDIO UNLOCK
   ========================================= */
 
   [
     "pointerdown",
     "touchstart",
     "keydown"
-  ].forEach((eventName) => {
-    document.addEventListener(
-      eventName,
-      unlockAudio,
-      {
-        passive: true,
-        once: false
-      }
-    );
-  });
+  ].forEach(
+    (eventName) => {
+
+      document.addEventListener(
+        eventName,
+        unlockAudio,
+        {
+          passive: true
+        }
+      );
+
+    }
+  );
 
 
   /* =========================================
      LOADER
   ========================================= */
 
-  function updateLoaderProgress(value) {
-    value = Math.max(0, Math.min(100, value));
+  function updateLoaderProgress(
+    value
+  ) {
+
+    const safeValue =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          value
+        )
+      );
 
     loaderProgress.textContent =
-      `${Math.round(value)}%`;
+      `${Math.round(safeValue)}%`;
 
     loaderProgressBar.style.width =
-      `${value}%`;
+      `${safeValue}%`;
   }
 
 
-  function runLoaderCheck(index) {
+  function runLoaderCheck(
+    index
+  ) {
 
-    const item = loaderChecks[index];
+    const item =
+      loaderChecks[index];
 
     if (!item) {
       return;
     }
 
-    item.classList.add("is-active");
+    item.classList.add(
+      "is-active"
+    );
 
     const state =
-      item.querySelector(".check-state");
+      item.querySelector(
+        ".check-state"
+      );
 
     if (state) {
-      state.textContent = "ПРОВЕРКА";
+      state.textContent =
+        "ПРОВЕРКА";
     }
 
     soundClick();
 
-    window.setTimeout(() => {
+    window.setTimeout(
+      () => {
 
-      item.classList.remove("is-active");
-      item.classList.add("is-done");
+        item.classList.remove(
+          "is-active"
+        );
 
-      if (state) {
-        state.textContent = "ГОТОВО";
-      }
+        item.classList.add(
+          "is-done"
+        );
 
-    }, 430);
+        if (state) {
+
+          state.textContent =
+            "ГОТОВО";
+        }
+
+      },
+      430
+    );
   }
 
 
@@ -762,68 +1069,95 @@
 
     updateLoaderProgress(0);
 
-    const checkDuration = 520;
-    const totalDuration =
-      loaderChecks.length * checkDuration;
+    loaderChecks.forEach(
+      (item) => {
 
-    loaderChecks.forEach((item) => {
-      item.classList.remove("is-active", "is-done");
+        item.classList.remove(
+          "is-active",
+          "is-done"
+        );
 
-      const state =
-        item.querySelector(".check-state");
+        const state =
+          item.querySelector(
+            ".check-state"
+          );
 
-      if (state) {
-        state.textContent = "ОЖИДАНИЕ";
+        if (state) {
+
+          state.textContent =
+            "ОЖИДАНИЕ";
+        }
+
       }
-    });
+    );
 
-    loaderReady.classList.remove("is-visible");
+    loaderReady.classList.remove(
+      "is-visible"
+    );
 
-    loaderChecks.forEach((_, index) => {
+    const interval =
+      520;
 
-      window.setTimeout(() => {
+    loaderChecks.forEach(
+      (_, index) => {
 
-        runLoaderCheck(index);
+        window.setTimeout(
+          () => {
 
-        const progress =
-          ((index + 1) / loaderChecks.length) * 100;
+            runLoaderCheck(
+              index
+            );
 
-        updateLoaderProgress(progress);
+            updateLoaderProgress(
+              ((index + 1) /
+                loaderChecks.length) *
+                100
+            );
 
-      }, index * checkDuration);
-    });
+          },
+          index * interval
+        );
 
-    window.setTimeout(() => {
+      }
+    );
 
-      loaderReady.classList.add("is-visible");
+    window.setTimeout(
+      () => {
 
-      soundReady();
+        loaderReady.classList.add(
+          "is-visible"
+        );
 
-    }, totalDuration + 180);
+        soundReady();
 
-    window.setTimeout(() => {
+      },
+      loaderChecks.length *
+        interval +
+        180
+    );
 
-      loader.classList.add("is-hidden");
+    window.setTimeout(
+      () => {
 
-    }, totalDuration + 950);
+        loader.classList.add(
+          "is-hidden"
+        );
+
+      },
+      loaderChecks.length *
+        interval +
+        950
+    );
   }
 
 
   /* =========================================
-     INITIAL STATE
+     INITIALIZATION
   ========================================= */
 
-  setSceneActive(0);
+  setTranslate(0);
 
-  currentTranslate = 0;
-  targetTranslate = 0;
-
-  experience.style.transition = "none";
-  applyTransform(0);
-
-  window.setTimeout(() => {
-    experience.style.transition = "";
-  }, 100);
+  activateScene(0);
 
   runLoader();
 
