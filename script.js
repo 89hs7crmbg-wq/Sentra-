@@ -1,1787 +1,860 @@
 (() => {
   "use strict";
 
+  /* =========================================================
+     SENTRA — EXPERIENCE CONTROLLER + ADAPTIVE SOUND
+     ========================================================= */
 
-  /* =====================================================
-     ELEMENTS
-  ===================================================== */
+  const track = document.querySelector(".track");
+  const scenes = [...document.querySelectorAll(".scene")];
 
-  const loader = document.getElementById("loader");
-  const loaderProgress = document.getElementById("loaderProgress");
-  const loaderPercent = document.getElementById("loaderPercent");
+  const progressCurrent = document.querySelector(".progress-current");
+  const progressTotal = document.querySelector(".progress-total");
+  const progressBar = document.querySelector(".progress-line span");
 
-  const loaderChecks = [
-    ...document.querySelectorAll(".loader-check")
-  ];
+  const dateElement = document.querySelector("[data-date]");
+  const timeElement = document.querySelector("[data-time]");
 
-  const loaderFinal = document.getElementById("loaderFinal");
+  const loader = document.querySelector(".loader");
+  const loaderProgress = document.querySelector(".loader-progress span");
+  const loaderStatus = document.querySelector(".loader-status");
+  const loaderChecks = [...document.querySelectorAll(".loader-check")];
 
-  const site = document.getElementById("site");
-  const experience = document.getElementById("experience");
-  const track = document.getElementById("track");
+  const menuButton = document.querySelector(".menu-toggle");
+  const menu = document.querySelector(".mobile-menu");
 
-  const scenes = [
-    ...document.querySelectorAll(".scene")
-  ];
-
-  const liveDate =
-    document.getElementById("liveDate");
-
-  const liveTime =
-    document.getElementById("liveTime");
-
-  const progressCurrent =
-    document.getElementById("progressCurrent");
-
-  const progressFill =
-    document.getElementById("progressFill");
-
-  const navigationHint =
-    document.getElementById("navigationHint");
-
-  const menuButton =
-    document.getElementById("menuButton");
-
-  const mobileMenu =
-    document.getElementById("mobileMenu");
-
-  const mobileButtons = [
-    ...document.querySelectorAll("[data-go]")
-  ];
-
-
-  /* =====================================================
-     STATE
-  ===================================================== */
-
-  let currentIndex = 0;
+  let sceneIndex = 0;
+  let sceneCount = scenes.length;
 
   let isAnimating = false;
   let isDragging = false;
-  let wheelLocked = false;
+  let dragStartX = 0;
+  let dragCurrentX = 0;
+  let dragStartScene = 0;
 
-  let pointerStartX = 0;
-  let pointerCurrentX = 0;
+  let wheelLock = false;
+  let touchStartX = 0;
+  let touchStartY = 0;
 
-  let dragStartTranslate = 0;
-  let dragTranslate = 0;
-
-  let loaderStarted = false;
   let loaderFinished = false;
+  let loaderTimer = null;
 
-  let networkTimer = null;
+  /* =========================================================
+     AUDIO
+     ========================================================= */
 
-  let soundEnabled = true;
   let audioContext = null;
-  let masterGain = null;
+  let soundEnabled = true;
   let audioUnlocked = false;
   let soundControl = null;
 
-  let lastNetworkSound = -1;
+  let scannerOscillator = null;
+  let scannerGain = null;
+  let scannerRunning = false;
 
+  let lastNetworkSound = 0;
 
-  /* =====================================================
-     UTILITIES
-  ===================================================== */
+  function getAudioContext() {
+    if (!audioContext) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
-  const clamp = (
-    value,
-    min,
-    max
-  ) => {
-    return Math.min(
-      Math.max(value, min),
-      max
-    );
-  };
+      if (!AudioCtx) {
+        return null;
+      }
 
-
-  const lerp = (
-    a,
-    b,
-    amount
-  ) => {
-    return a + (b - a) * amount;
-  };
-
-
-  const formatScene = (index) => {
-    return String(index + 1).padStart(2, "0");
-  };
-
-
-  /* =====================================================
-     SOUND ENGINE
-  ===================================================== */
-
-  function initAudio() {
-
-    if (audioContext) {
-      return;
+      audioContext = new AudioCtx();
     }
 
-    const AudioContext =
-      window.AudioContext ||
-      window.webkitAudioContext;
-
-    if (!AudioContext) {
-      return;
-    }
-
-    audioContext =
-      new AudioContext();
-
-    masterGain =
-      audioContext.createGain();
-
-    masterGain.gain.value =
-      soundEnabled
-        ? 0.055
-        : 0.0001;
-
-    masterGain.connect(
-      audioContext.destination
-    );
+    return audioContext;
   }
 
+  function unlockAudio() {
+    if (!soundEnabled) return;
 
-  async function unlockAudio() {
+    const ctx = getAudioContext();
 
-    initAudio();
+    if (!ctx) return;
 
-    if (!audioContext) {
-      return;
-    }
-
-    if (
-      audioContext.state ===
-      "suspended"
-    ) {
-
-      try {
-        await audioContext.resume();
-      } catch (_) {
-        return;
-      }
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
     }
 
     audioUnlocked = true;
   }
 
-
-  function soundReady() {
-
-    return (
-      soundEnabled &&
-      audioUnlocked &&
-      audioContext &&
-      masterGain
-    );
+  function nowTime() {
+    const ctx = getAudioContext();
+    return ctx ? ctx.currentTime : 0;
   }
 
+  function createGain(value = 0.08) {
+    const ctx = getAudioContext();
+    if (!ctx) return null;
 
-  function audioNow() {
+    const gain = ctx.createGain();
+    gain.gain.value = value;
+    gain.connect(ctx.destination);
 
-    return audioContext.currentTime;
+    return gain;
   }
 
-
-  function playTone({
-    type = "sine",
+  function tone({
     frequency = 440,
-    start = audioNow(),
     duration = 0.08,
-    volume = 0.5,
+    type = "sine",
+    volume = 0.04,
     attack = 0.005,
-    release = 0.05,
+    release = 0.08,
     detune = 0
-  }) {
+  } = {}) {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
     }
 
-    const oscillator =
-      audioContext.createOscillator();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
 
-    const gain =
-      audioContext.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
+    oscillator.detune.setValueAtTime(detune, ctx.currentTime);
 
-    oscillator.type =
-      type;
-
-    oscillator.frequency.setValueAtTime(
-      frequency,
-      start
-    );
-
-    oscillator.detune.setValueAtTime(
-      detune,
-      start
-    );
-
-    gain.gain.setValueAtTime(
-      0.0001,
-      start
-    );
-
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(
-      Math.max(
-        volume,
-        0.0001
-      ),
-      start + attack
+      Math.max(volume, 0.0002),
+      ctx.currentTime + attack
     );
 
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      start +
-        duration +
-        release
+      ctx.currentTime + duration + release
     );
 
     oscillator.connect(gain);
-    gain.connect(masterGain);
+    gain.connect(ctx.destination);
 
-    oscillator.start(start);
-
-    oscillator.stop(
-      start +
-      duration +
-      release +
-      0.02
-    );
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + duration + release + 0.02);
   }
 
+  function noiseBurst({
+    duration = 0.12,
+    volume = 0.025,
+    filterFrequency = 1800
+  } = {}) {
+    if (!soundEnabled || !audioUnlocked) return;
 
-  function playNoise({
-    start = audioNow(),
-    duration = 0.15,
-    volume = 0.1,
-    frequency = 1800
-  }) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
-    if (!soundReady()) {
-      return;
-    }
-
-    const bufferSize =
-      audioContext.sampleRate *
-      duration;
-
-    const buffer =
-      audioContext.createBuffer(
-        1,
-        bufferSize,
-        audioContext.sampleRate
-      );
-
-    const data =
-      buffer.getChannelData(0);
-
-    for (
-      let i = 0;
-      i < bufferSize;
-      i++
-    ) {
-
-      data[i] =
-        Math.random() * 2 - 1;
-    }
-
-    const source =
-      audioContext.createBufferSource();
-
-    const filter =
-      audioContext.createBiquadFilter();
-
-    const gain =
-      audioContext.createGain();
-
-    source.buffer =
-      buffer;
-
-    filter.type =
-      "bandpass";
-
-    filter.frequency.value =
-      frequency;
-
-    filter.Q.value =
-      1.2;
-
-    gain.gain.setValueAtTime(
-      0.0001,
-      start
+    const bufferSize = Math.floor(ctx.sampleRate * duration);
+    const buffer = ctx.createBuffer(
+      1,
+      bufferSize,
+      ctx.sampleRate
     );
 
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const source = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    filter.type = "bandpass";
+    filter.frequency.value = filterFrequency;
+    filter.Q.value = 1.4;
+
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(
-      Math.max(
-        volume,
-        0.0001
-      ),
-      start + 0.008
+      volume,
+      ctx.currentTime + 0.008
     );
 
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      start + duration
+      ctx.currentTime + duration
     );
+
+    source.buffer = buffer;
 
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(masterGain);
+    gain.connect(ctx.destination);
 
-    source.start(start);
-
-    source.stop(
-      start +
-      duration +
-      0.02
-    );
+    source.start();
+    source.stop(ctx.currentTime + duration + 0.02);
   }
 
-
-  /* =====================================================
-     SOUND — UI
-  ===================================================== */
-
-  function soundClick() {
-
-    playTone({
+  function clickSound() {
+    tone({
+      frequency: 1250,
+      duration: 0.035,
       type: "square",
-      frequency: 1450,
-      duration: 0.025,
-      volume: 0.7 * 0.32,
+      volume: 0.025,
       attack: 0.001,
       release: 0.025
     });
-  }
 
-
-  function soundSoftClick() {
-
-    playTone({
+    tone({
+      frequency: 720,
+      duration: 0.025,
       type: "sine",
-      frequency: 980,
-      duration: 0.035,
-      volume: 0.7 * 0.22,
+      volume: 0.012,
       attack: 0.001,
-      release: 0.04
+      release: 0.02,
+      detune: -20
     });
   }
-
-
-  /* =====================================================
-     SOUND — LOADER
-  ===================================================== */
 
   function soundBoot() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playTone({
+    tone({
+      frequency: 110,
+      duration: 0.16,
       type: "sine",
-      frequency: 62,
-      start: time,
-      duration: 0.24,
-      volume: 0.7,
-      attack: 0.02,
-      release: 0.22
+      volume: 0.035,
+      attack: 0.015,
+      release: 0.12
     });
 
-    playTone({
-      type: "triangle",
-      frequency: 440,
-      start: time + 0.12,
-      duration: 0.08,
-      volume: 0.18,
-      attack: 0.002,
-      release: 0.06
-    });
+    setTimeout(() => {
+      tone({
+        frequency: 220,
+        duration: 0.18,
+        type: "sine",
+        volume: 0.025,
+        attack: 0.01,
+        release: 0.14
+      });
+    }, 90);
+
+    setTimeout(() => {
+      clickSound();
+    }, 210);
   }
-
 
   function soundSystemCheck() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    soundSoftClick();
+    clickSound();
 
-    setTimeout(
-      () => {
-
-        playTone({
-          type: "sine",
-          frequency: 760,
-          duration: 0.035,
-          volume: 0.14,
-          attack: 0.002,
-          release: 0.05
-        });
-
-      },
-      55
-    );
+    setTimeout(() => {
+      tone({
+        frequency: 660,
+        duration: 0.055,
+        type: "sine",
+        volume: 0.018,
+        attack: 0.003,
+        release: 0.04
+      });
+    }, 100);
   }
-
 
   function soundSystemReady() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playTone({
+    tone({
+      frequency: 392,
+      duration: 0.08,
       type: "sine",
-      frequency: 410,
-      start: time,
-      duration: 0.07,
-      volume: 0.2,
-      attack: 0.004,
-      release: 0.07
+      volume: 0.025
     });
 
-    playTone({
-      type: "sine",
-      frequency: 620,
-      start: time + 0.075,
-      duration: 0.1,
-      volume: 0.22,
-      attack: 0.004,
-      release: 0.08
-    });
+    setTimeout(() => {
+      tone({
+        frequency: 587.33,
+        duration: 0.12,
+        type: "sine",
+        volume: 0.035
+      });
+    }, 100);
 
-    playTone({
-      type: "sine",
-      frequency: 920,
-      start: time + 0.16,
-      duration: 0.12,
-      volume: 0.18,
-      attack: 0.004,
-      release: 0.1
-    });
+    setTimeout(() => {
+      tone({
+        frequency: 783.99,
+        duration: 0.16,
+        type: "sine",
+        volume: 0.045
+      });
+    }, 210);
   }
 
+  function soundTransition() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-  /* =====================================================
-     SOUND — SCENE TRANSITION
-  ===================================================== */
-
-  function soundTransition(
-    direction = 1
-  ) {
-
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playNoise({
-      start: time,
-      duration: 0.075,
-      volume: 0.025,
-      frequency:
-        direction > 0
-          ? 1450
-          : 1050
+    noiseBurst({
+      duration: 0.09,
+      volume: 0.018,
+      filterFrequency: 1500
     });
 
-    playTone({
-      type: "triangle",
-      frequency:
-        direction > 0
-          ? 210
-          : 170,
-      start: time,
-      duration: 0.075,
-      volume: 0.06,
-      attack: 0.002,
-      release: 0.08
+    tone({
+      frequency: 180,
+      duration: 0.08,
+      type: "sine",
+      volume: 0.012
     });
 
-    setTimeout(
-      soundClick,
-      85
+    setTimeout(() => {
+      clickSound();
+    }, 80);
+  }
+
+  function startScannerSound() {
+    if (!soundEnabled || !audioUnlocked || scannerRunning) return;
+
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    scannerOscillator = ctx.createOscillator();
+    scannerGain = ctx.createGain();
+
+    scannerOscillator.type = "sine";
+
+    scannerOscillator.frequency.setValueAtTime(
+      170,
+      ctx.currentTime
     );
+
+    scannerOscillator.frequency.linearRampToValueAtTime(
+      820,
+      ctx.currentTime + 1.5
+    );
+
+    scannerOscillator.frequency.linearRampToValueAtTime(
+      210,
+      ctx.currentTime + 3.0
+    );
+
+    scannerGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+
+    scannerGain.gain.linearRampToValueAtTime(
+      0.022,
+      ctx.currentTime + 0.18
+    );
+
+    scannerGain.gain.linearRampToValueAtTime(
+      0.0001,
+      ctx.currentTime + 3.0
+    );
+
+    scannerOscillator.connect(scannerGain);
+    scannerGain.connect(ctx.destination);
+
+    scannerOscillator.start();
+
+    scannerRunning = true;
+
+    setTimeout(() => {
+      if (scannerOscillator) {
+        try {
+          scannerOscillator.stop();
+        } catch (_) {}
+      }
+
+      scannerOscillator = null;
+      scannerGain = null;
+      scannerRunning = false;
+    }, 3050);
+
+    setTimeout(() => {
+      if (soundEnabled && audioUnlocked) {
+        tone({
+          frequency: 1180,
+          duration: 0.045,
+          type: "sine",
+          volume: 0.025
+        });
+      }
+    }, 1500);
   }
 
+  function stopScannerSound() {
+    if (!scannerOscillator) return;
 
-  /* =====================================================
-     SOUND — SURVEILLANCE
-  ===================================================== */
+    try {
+      scannerOscillator.stop();
+    } catch (_) {}
 
-  function soundScanner() {
-
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playTone({
-      type: "sine",
-      frequency: 1050,
-      start: time,
-      duration: 0.42,
-      volume: 0.32 * 0.22,
-      attack: 0.08,
-      release: 0.14
-    });
-
-    playTone({
-      type: "sine",
-      frequency: 2100,
-      start: time + 0.08,
-      duration: 0.28,
-      volume: 0.32 * 0.08,
-      attack: 0.05,
-      release: 0.12
-    });
+    scannerOscillator = null;
+    scannerGain = null;
+    scannerRunning = false;
   }
-
-
-  function soundScanPing() {
-
-    playTone({
-      type: "sine",
-      frequency: 1480,
-      duration: 0.045,
-      volume: 0.07,
-      attack: 0.002,
-      release: 0.05
-    });
-  }
-
-
-  /* =====================================================
-     SOUND — DETECTION
-  ===================================================== */
 
   function soundDetection() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playTone({
+    tone({
+      frequency: 92,
+      duration: 0.17,
       type: "sine",
-      frequency: 145,
-      start: time,
-      duration: 0.11,
-      volume: 0.3,
-      attack: 0.005,
-      release: 0.12
+      volume: 0.035,
+      attack: 0.008,
+      release: 0.16
     });
 
-    playTone({
-      type: "square",
-      frequency: 860,
-      start: time + 0.11,
-      duration: 0.035,
-      volume: 0.11,
-      attack: 0.001,
-      release: 0.035
-    });
+    setTimeout(() => {
+      clickSound();
+    }, 170);
 
-    playTone({
-      type: "square",
-      frequency: 860,
-      start: time + 0.19,
-      duration: 0.035,
-      volume: 0.085,
-      attack: 0.001,
-      release: 0.035
-    });
+    setTimeout(() => {
+      tone({
+        frequency: 520,
+        duration: 0.055,
+        type: "square",
+        volume: 0.022
+      });
+    }, 270);
   }
-
-
-  /* =====================================================
-     SOUND — ACCESS
-  ===================================================== */
 
   function soundAccessGranted() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playTone({
+    tone({
+      frequency: 740,
+      duration: 0.07,
       type: "sine",
-      frequency: 720,
-      start: time,
-      duration: 0.045,
-      volume: 0.15,
-      attack: 0.002,
-      release: 0.05
+      volume: 0.025
     });
 
-    playTone({
-      type: "sine",
-      frequency: 1040,
-      start: time + 0.075,
-      duration: 0.09,
-      volume: 0.2,
-      attack: 0.002,
-      release: 0.08
-    });
+    setTimeout(() => {
+      tone({
+        frequency: 1046.5,
+        duration: 0.12,
+        type: "sine",
+        volume: 0.04
+      });
+    }, 90);
   }
-
-
-  /* =====================================================
-     SOUND — ALERT
-  ===================================================== */
 
   function soundAlert() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
-    }
-
-    const time =
-      audioNow();
-
-    playTone({
+    tone({
+      frequency: 68,
+      duration: 0.28,
       type: "sine",
-      frequency: 112,
-      start: time,
-      duration: 0.18,
-      volume: 0.8 * 0.35,
-      attack: 0.01,
-      release: 0.2
+      volume: 0.045,
+      attack: 0.015,
+      release: 0.18
     });
 
-    playTone({
-      type: "square",
-      frequency: 780,
-      start: time + 0.12,
-      duration: 0.045,
-      volume: 0.8 * 0.16,
-      attack: 0.002,
-      release: 0.04
-    });
-
-    playTone({
-      type: "sine",
-      frequency: 112,
-      start: time + 0.34,
-      duration: 0.18,
-      volume: 0.8 * 0.28,
-      attack: 0.01,
-      release: 0.2
-    });
+    setTimeout(() => {
+      tone({
+        frequency: 58,
+        duration: 0.22,
+        type: "sine",
+        volume: 0.035
+      });
+    }, 240);
   }
-
-
-  /* =====================================================
-     SOUND — MAINTENANCE
-  ===================================================== */
 
   function soundMaintenance() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-    if (!soundReady()) {
-      return;
-    }
+    clickSound();
 
-    const time =
-      audioNow();
+    setTimeout(() => {
+      tone({
+        frequency: 330,
+        duration: 0.06,
+        type: "square",
+        volume: 0.018
+      });
+    }, 130);
 
-    playTone({
-      type: "square",
-      frequency: 420,
-      start: time,
-      duration: 0.025,
-      volume: 0.08,
-      attack: 0.001,
-      release: 0.025
-    });
-
-    playTone({
-      type: "square",
-      frequency: 510,
-      start: time + 0.075,
-      duration: 0.025,
-      volume: 0.07,
-      attack: 0.001,
-      release: 0.025
-    });
+    setTimeout(() => {
+      clickSound();
+    }, 260);
   }
 
+  function soundNetwork() {
+    if (!soundEnabled || !audioUnlocked) return;
 
-  /* =====================================================
-     SOUND — CONTROL CENTER
-  ===================================================== */
+    const current = performance.now();
 
-  function soundNetworkSignal(
-    node = 0
-  ) {
-
-    if (!soundReady()) {
+    if (current - lastNetworkSound < 650) {
       return;
     }
 
-    const frequencies = [
-      1180,
-      920,
-      680,
-      520
-    ];
+    lastNetworkSound = current;
 
-    const frequency =
-      frequencies[
-        node %
-        frequencies.length
-      ];
-
-    const time =
-      audioNow();
-
-    playTone({
-      type: "sine",
-      frequency,
-      start: time,
+    tone({
+      frequency: 520,
       duration: 0.045,
-      volume: 0.075,
-      attack: 0.002,
-      release: 0.05
+      type: "sine",
+      volume: 0.012
     });
 
-    playTone({
-      type: "sine",
-      frequency:
-        frequency * 0.5,
-      start: time + 0.06,
+    setTimeout(() => {
+      tone({
+        frequency: 780,
+        duration: 0.045,
+        type: "sine",
+        volume: 0.014
+      });
+    }, 80);
+  }
+
+  function soundFinal() {
+    if (!soundEnabled || !audioUnlocked) return;
+
+    tone({
+      frequency: 392,
       duration: 0.08,
-      volume: 0.05,
-      attack: 0.002,
-      release: 0.07
-    });
-  }
-
-
-  function soundNetworkCenter() {
-
-    playTone({
       type: "sine",
-      frequency: 610,
-      duration: 0.09,
-      volume: 0.12,
-      attack: 0.004,
-      release: 0.1
+      volume: 0.025
     });
+
+    setTimeout(() => {
+      tone({
+        frequency: 659.25,
+        duration: 0.1,
+        type: "sine",
+        volume: 0.03
+      });
+    }, 110);
+
+    setTimeout(() => {
+      tone({
+        frequency: 783.99,
+        duration: 0.17,
+        type: "sine",
+        volume: 0.04
+      });
+    }, 220);
   }
-
-
-  /* =====================================================
-     SOUND CONTROL
-  ===================================================== */
 
   function createSoundControl() {
+    if (soundControl) return;
 
-    if (
-      document.getElementById(
-        "sentraSoundControl"
-      )
-    ) {
-      return;
-    }
+    soundControl = document.createElement("button");
+    soundControl.id = "sentraSoundControl";
+    soundControl.type = "button";
+    soundControl.textContent = "SOUND / ON";
 
-    soundControl =
-      document.createElement(
-        "button"
-      );
+    document.body.appendChild(soundControl);
 
-    soundControl.id =
-      "sentraSoundControl";
+    soundControl.addEventListener("click", (event) => {
+      event.stopPropagation();
 
-    soundControl.type =
-      "button";
+      if (!soundEnabled) {
+        soundEnabled = true;
+        unlockAudio();
 
-    soundControl.innerHTML = `
-      <span class="sentra-sound-dot"></span>
-      <span class="sentra-sound-label">
-        SOUND / ON
-      </span>
-    `;
+        soundControl.textContent = "SOUND / ON";
 
-    soundControl.setAttribute(
-      "aria-label",
-      "Переключить звук"
-    );
+        tone({
+          frequency: 620,
+          duration: 0.08,
+          type: "sine",
+          volume: 0.025
+        });
+      } else {
+        soundEnabled = false;
+        stopScannerSound();
 
-    Object.assign(
-      soundControl.style,
-      {
-        position: "fixed",
-        right: "34px",
-        bottom: "24px",
-        zIndex: "9500",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        padding: "8px 11px",
-        border:
-          "1px solid rgba(255,255,255,.12)",
-        background:
-          "rgba(10,10,10,.68)",
-        color:
-          "rgba(255,255,255,.72)",
-        fontFamily:
-          '"IBM Plex Mono","SFMono-Regular",Consolas,monospace',
-        fontSize: "9px",
-        letterSpacing: ".12em",
-        textTransform: "uppercase",
-        cursor: "pointer",
-        backdropFilter:
-          "blur(12px)",
-        WebkitBackdropFilter:
-          "blur(12px)",
-        transition:
-          "all .25s ease"
+        soundControl.textContent = "SOUND / OFF";
       }
-    );
-
-    const dot =
-      soundControl.querySelector(
-        ".sentra-sound-dot"
-      );
-
-    Object.assign(
-      dot.style,
-      {
-        width: "5px",
-        height: "5px",
-        borderRadius: "50%",
-        background: "#c9a45a",
-        boxShadow:
-          "0 0 10px rgba(201,164,90,.65)",
-        transition:
-          "all .25s ease"
-      }
-    );
-
-    soundControl.addEventListener(
-      "mouseenter",
-      () => {
-
-        soundControl.style.color =
-          "#fff";
-
-        soundControl.style.borderColor =
-          "rgba(201,164,90,.5)";
-
-        soundControl.style.background =
-          "rgba(15,15,15,.82)";
-      }
-    );
-
-    soundControl.addEventListener(
-      "mouseleave",
-      () => {
-
-        soundControl.style.color =
-          soundEnabled
-            ? "rgba(255,255,255,.72)"
-            : "rgba(255,255,255,.38)";
-
-        soundControl.style.borderColor =
-          soundEnabled
-            ? "rgba(255,255,255,.12)"
-            : "rgba(255,255,255,.08)";
-
-        soundControl.style.background =
-          "rgba(10,10,10,.68)";
-      }
-    );
-
-    soundControl.addEventListener(
-      "click",
-      async () => {
-
-        await unlockAudio();
-
-        soundEnabled =
-          !soundEnabled;
-
-        if (
-          masterGain &&
-          audioContext
-        ) {
-
-          masterGain.gain.cancelScheduledValues(
-            audioContext.currentTime
-          );
-
-          masterGain.gain.setTargetAtTime(
-            soundEnabled
-              ? 0.055
-              : 0.0001,
-            audioContext.currentTime,
-            0.035
-          );
-        }
-
-        updateSoundControl();
-
-        if (soundEnabled) {
-          soundClick();
-        }
-      }
-    );
-
-    document.body.appendChild(
-      soundControl
-    );
-
-    updateSoundControl();
+    });
   }
 
+  function playSceneSound(index) {
+    if (!soundEnabled || !audioUnlocked) return;
 
-  function updateSoundControl() {
+    stopScannerSound();
 
-    if (!soundControl) {
-      return;
+    switch (index) {
+      case 0:
+        clickSound();
+        break;
+
+      case 1:
+        startScannerSound();
+        break;
+
+      case 2:
+        soundDetection();
+        break;
+
+      case 3:
+        soundAccessGranted();
+        break;
+
+      case 4:
+        soundAlert();
+        break;
+
+      case 5:
+        soundMaintenance();
+        break;
+
+      case 6:
+        soundNetwork();
+        break;
+
+      case 7:
+        soundFinal();
+        break;
     }
-
-    const label =
-      soundControl.querySelector(
-        ".sentra-sound-label"
-      );
-
-    const dot =
-      soundControl.querySelector(
-        ".sentra-sound-dot"
-      );
-
-    if (label) {
-
-      label.textContent =
-        soundEnabled
-          ? "SOUND / ON"
-          : "SOUND / OFF";
-    }
-
-    if (dot) {
-
-      dot.style.background =
-        soundEnabled
-          ? "#c9a45a"
-          : "rgba(255,255,255,.22)";
-
-      dot.style.boxShadow =
-        soundEnabled
-          ? "0 0 10px rgba(201,164,90,.65)"
-          : "none";
-    }
-
-    soundControl.style.color =
-      soundEnabled
-        ? "rgba(255,255,255,.72)"
-        : "rgba(255,255,255,.38)";
-
-    soundControl.style.borderColor =
-      soundEnabled
-        ? "rgba(255,255,255,.12)"
-        : "rgba(255,255,255,.08)";
   }
 
-
-  /* =====================================================
+  /* =========================================================
      FIRST USER INTERACTION
-     ===================================================== */
+     ========================================================= */
 
-  let firstInteractionHandled = false;
+  function firstInteraction() {
+    if (!audioUnlocked) {
+      unlockAudio();
 
-  async function handleFirstInteraction() {
-
-    if (firstInteractionHandled) {
-      return;
-    }
-
-    firstInteractionHandled = true;
-
-    await unlockAudio();
-
-    if (
-      loaderStarted &&
-      !loaderFinished
-    ) {
-
-      soundBoot();
+      if (!loaderFinished) {
+        soundBoot();
+      }
     }
   }
 
-
-  [
+  window.addEventListener(
     "pointerdown",
-    "touchstart",
-    "keydown"
-  ].forEach(
-    (eventName) => {
-
-      window.addEventListener(
-        eventName,
-        handleFirstInteraction,
-        {
-          passive: true,
-          once: false
-        }
-      );
-
-    }
+    firstInteraction,
+    { passive: true, once: false }
   );
 
+  window.addEventListener(
+    "touchstart",
+    firstInteraction,
+    { passive: true, once: false }
+  );
 
-  /* =====================================================
+  window.addEventListener(
+    "keydown",
+    firstInteraction,
+    { passive: true, once: false }
+  );
+
+  /* =========================================================
      CLOCK
-  ===================================================== */
+     ========================================================= */
 
   function updateClock() {
+    const now = new Date();
 
-    const now =
-      new Date();
-
-    if (liveDate) {
-
-      liveDate.textContent =
-        new Intl.DateTimeFormat(
-          "ru-RU",
-          {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric"
-          }
-        ).format(now);
+    if (dateElement) {
+      dateElement.textContent = new Intl.DateTimeFormat(
+        "ru-RU",
+        {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric"
+        }
+      ).format(now);
     }
 
-    if (liveTime) {
-
-      liveTime.textContent =
-        new Intl.DateTimeFormat(
-          "ru-RU",
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false
-          }
-        ).format(now);
+    if (timeElement) {
+      timeElement.textContent = new Intl.DateTimeFormat(
+        "ru-RU",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        }
+      ).format(now);
     }
   }
 
   updateClock();
+  setInterval(updateClock, 1000);
 
-  setInterval(
-    updateClock,
-    1000
-  );
-
-
-  /* =====================================================
+  /* =========================================================
      LOADER
-  ===================================================== */
+     ========================================================= */
 
-  function setLoaderProgress(
-    value
-  ) {
+  function updateLoader(step) {
+    if (!loaderChecks.length) return;
 
-    const safeValue =
-      clamp(
-        value,
-        0,
-        100
-      );
+    loaderChecks.forEach((item, index) => {
+      item.classList.remove("active", "done");
 
-    if (loaderProgress) {
+      const state = item.querySelector(".loader-check-state");
 
-      loaderProgress.style.width =
-        `${safeValue}%`;
-    }
+      if (index < step) {
+        item.classList.add("done");
 
-    if (loaderPercent) {
-
-      loaderPercent.textContent =
-        `${String(
-          Math.round(
-            safeValue
-          )
-        ).padStart(
-          2,
-          "0"
-        )}%`;
-    }
-  }
-
-
-  function setLoaderStep(
-    index
-  ) {
-
-    loaderChecks.forEach(
-      (
-        item,
-        itemIndex
-      ) => {
-
-        item.classList.remove(
-          "is-active"
-        );
-
-        if (
-          itemIndex <
-          index
-        ) {
-
-          item.classList.add(
-            "is-done"
-          );
-
-          const status =
-            item.querySelector(
-              "strong"
-            );
-
-          if (status) {
-            status.textContent =
-              "ОК";
-          }
+        if (state) {
+          state.textContent = "OK";
         }
+      } else if (index === step) {
+        item.classList.add("active");
 
-        if (
-          itemIndex ===
-          index
-        ) {
-
-          item.classList.add(
-            "is-active"
-          );
-
-          const status =
-            item.querySelector(
-              "strong"
-            );
-
-          if (status) {
-            status.textContent =
-              "ПРОВЕРКА";
-          }
+        if (state) {
+          state.textContent = "CHECK";
+        }
+      } else {
+        if (state) {
+          state.textContent = "WAIT";
         }
       }
-    );
+    });
   }
 
-
   function finishLoader() {
-
-    if (loaderFinished) {
-      return;
-    }
+    if (loaderFinished) return;
 
     loaderFinished = true;
 
-    loaderChecks.forEach(
-      (item) => {
+    if (loader) {
+      loader.classList.add("ready");
+    }
 
-        item.classList.remove(
-          "is-active"
-        );
+    if (loaderProgress) {
+      loaderProgress.style.width = "100%";
+    }
 
-        item.classList.add(
-          "is-done"
-        );
-
-        const status =
-          item.querySelector(
-            "strong"
-          );
-
-        if (status) {
-          status.textContent =
-            "ОК";
-        }
-      }
-    );
-
-    setLoaderProgress(
-      100
-    );
-
-    if (loaderFinal) {
-
-      loaderFinal.classList.add(
-        "is-visible"
-      );
+    if (loaderStatus) {
+      loaderStatus.textContent = "СИСТЕМА ГОТОВА";
     }
 
     soundSystemReady();
 
-    setTimeout(
-      () => {
+    setTimeout(() => {
+      if (!loader) return;
 
-        if (loader) {
+      loader.style.opacity = "0";
+      loader.style.pointerEvents = "none";
 
-          loader.classList.add(
-            "is-hidden"
-          );
-
-          setTimeout(
-            () => {
-
-              if (
-                loader &&
-                loader.parentNode
-              ) {
-
-                loader.remove();
-              }
-
-            },
-            900
-          );
-        }
-
-        activateScene(
-          0,
-          false,
-          false
-        );
-
-      },
-      750
-    );
+      setTimeout(() => {
+        loader.style.display = "none";
+      }, 700);
+    }, 800);
   }
 
-
-  function startLoader() {
-
-    if (loaderStarted) {
+  function runLoader() {
+    if (!loader) {
+      loaderFinished = true;
       return;
     }
 
-    loaderStarted = true;
+    const totalSteps = Math.max(loaderChecks.length, 5);
+    const stepDuration = 690;
 
-    const duration =
-      4300;
+    let currentStep = 0;
 
-    const start =
-      performance.now();
+    updateLoader(0);
 
-    function animateLoader(
-      now
-    ) {
+    if (loaderStatus) {
+      loaderStatus.textContent = "СИСТЕМА ЗАПУСКАЕТСЯ";
+    }
 
-      const elapsed =
-        now - start;
+    if (loaderProgress) {
+      loaderProgress.style.width = "0%";
+    }
 
-      const progress =
-        clamp(
-          (
-            elapsed /
-            duration
-          ) * 100,
-          0,
-          100
-        );
+    loaderTimer = setInterval(() => {
+      if (currentStep < totalSteps) {
+        updateLoader(currentStep);
 
-      setLoaderProgress(
-        progress
-      );
+        if (loaderStatus) {
+          const current = loaderChecks[currentStep];
 
-      const step =
-        Math.min(
-          loaderChecks.length - 1,
-          Math.floor(
-            (
-              progress /
+          if (current) {
+            const text =
+              current.querySelector(".loader-check-name");
+
+            if (text) {
+              loaderStatus.textContent =
+                text.textContent.trim();
+            }
+          }
+        }
+
+        soundSystemCheck();
+
+        currentStep++;
+
+        if (loaderProgress) {
+          const percent =
+            Math.min(
+              (currentStep / totalSteps) * 100,
               100
-            ) *
-            loaderChecks.length
-          )
-        );
+            );
 
-      setLoaderStep(
-        step
-      );
+          loaderProgress.style.width =
+            `${percent}%`;
+        }
+      } else {
+        clearInterval(loaderTimer);
+        loaderTimer = null;
 
-      if (progress >= 100) {
+        updateLoader(totalSteps);
+
+        if (loaderStatus) {
+          loaderStatus.textContent = "СИСТЕМА ГОТОВА";
+        }
 
         finishLoader();
-
-        return;
       }
-
-      requestAnimationFrame(
-        animateLoader
-      );
-    }
-
-    requestAnimationFrame(
-      animateLoader
-    );
+    }, stepDuration);
   }
 
+  /* =========================================================
+     SCENE ACTIVATION
+     ========================================================= */
 
-  /* =====================================================
-     TRANSLATE
-  ===================================================== */
-
-  function getTargetTranslate(
-    index
-  ) {
-
-    return -(
-      index *
-      window.innerWidth
-    );
-  }
-
-
-  function applyTranslate(
-    value,
-    animate = true
-  ) {
-
-    if (!track) {
-      return;
-    }
-
-    if (!animate) {
-
-      track.style.transition =
-        "none";
-
-    } else {
-
-      track.style.transition =
-        "transform .85s cubic-bezier(.22,.61,.36,1)";
-    }
-
-    track.style.transform =
-      `translate3d(${value}px,0,0)`;
-
-    if (!animate) {
-
-      requestAnimationFrame(
-        () => {
-
-          track.style.transition =
-            "transform .85s cubic-bezier(.22,.61,.36,1)";
-        }
-      );
-    }
-  }
-
-
-  /* =====================================================
-     SCENE SOUND
-  ===================================================== */
-
-  function playSceneSound(
-    index
-  ) {
-
-    if (!soundEnabled) {
-      return;
-    }
-
-    switch (index) {
-
-      case 0:
-
-        soundSoftClick();
-
-        break;
-
-
-      case 1:
-
-        soundScanner();
-
-        setTimeout(
-          () => {
-
-            if (
-              currentIndex ===
-              1
-            ) {
-
-              soundScanPing();
-            }
-
-          },
-          900
-        );
-
-        break;
-
-
-      case 2:
-
-        soundDetection();
-
-        break;
-
-
-      case 3:
-
-        soundAccessGranted();
-
-        break;
-
-
-      case 4:
-
-        soundAlert();
-
-        break;
-
-
-      case 5:
-
-        soundMaintenance();
-
-        break;
-
-
-      case 6:
-
-        soundNetworkSignal(
-          Math.floor(
-            Math.random() * 4
-          )
-        );
-
-        break;
-
-
-      case 7:
-
-        soundSystemReady();
-
-        break;
-    }
-  }
-
-
-  /* =====================================================
-     SCENE
-  ===================================================== */
-
-  function activateScene(
-    index,
-    animate = true,
-    playSound = true
-  ) {
-
-    index =
-      clamp(
-        index,
-        0,
-        scenes.length - 1
-      );
-
-    currentIndex =
-      index;
-
-    applyTranslate(
-      getTargetTranslate(
-        index
-      ),
-      animate
-    );
-
-    scenes.forEach(
-      (
-        scene,
-        sceneIndex
-      ) => {
-
-        scene.classList.toggle(
-          "is-active",
-          sceneIndex === index
-        );
-
-      }
-    );
+  function setSceneActive(index) {
+    scenes.forEach((scene, i) => {
+      scene.classList.toggle("active", i === index);
+    });
 
     if (progressCurrent) {
-
       progressCurrent.textContent =
-        formatScene(
-          index
-        );
+        String(index + 1).padStart(2, "0");
     }
 
-    if (progressFill) {
-
-      progressFill.style.width =
-        `${
-          (
-            (index + 1) /
-            scenes.length
-          ) * 100
-        }%`;
+    if (progressTotal) {
+      progressTotal.textContent =
+        String(sceneCount).padStart(2, "0");
     }
 
-    if (
-      navigationHint
-    ) {
-
-      if (index > 0) {
-
-        navigationHint.classList.add(
-          "is-hidden"
-        );
-
-      } else {
-
-        navigationHint.classList.remove(
-          "is-hidden"
-        );
-      }
+    if (progressBar) {
+      progressBar.style.width =
+        `${((index + 1) / sceneCount) * 100}%`;
     }
 
-    if (
-      index === 6
-    ) {
-
-      startNetworkAnimation();
-
-    } else {
-
-      stopNetworkAnimation();
-    }
-
-    updateHash(
-      index
-    );
-
-    if (playSound) {
-
-      playSceneSound(
-        index
-      );
-    }
+    playSceneSound(index);
   }
 
+  function applyScene(index, animate = true) {
+    if (!track) return;
 
-  function goTo(
-    index
-  ) {
+    const offset = index * 100;
 
-    if (
-      isAnimating ||
-      isDragging
-    ) {
-      return;
-    }
+    track.style.transition = animate
+      ? "transform 720ms cubic-bezier(0.22, 1, 0.36, 1)"
+      : "none";
 
-    const target =
-      clamp(
-        index,
-        0,
-        scenes.length - 1
-      );
+    track.style.transform =
+      `translate3d(-${offset}vw, 0, 0)`;
 
-    if (
-      target ===
-      currentIndex
-    ) {
-      return;
-    }
-
-    isAnimating =
-      true;
-
-    soundTransition(
-      target >
-        currentIndex
-        ? 1
-        : -1
-    );
-
-    activateScene(
-      target,
-      true,
-      true
-    );
-
-    setTimeout(
-      () => {
-
-        isAnimating =
-          false;
-
-      },
-      900
-    );
+    setSceneActive(index);
   }
 
+  function goToScene(index, animate = true) {
+    if (sceneCount <= 0) return;
 
-  /* =====================================================
-     HASH
-  ===================================================== */
-
-  function updateHash(
-    index
-  ) {
-
-    const hash =
-      `#scene-${index + 1}`;
-
-    if (
-      history.replaceState
-    ) {
-
-      history.replaceState(
-        null,
-        "",
-        hash
-      );
-    }
-  }
-
-
-  function readHash() {
-
-    const match =
-      window.location.hash.match(
-        /#scene-(\d+)/
-      );
-
-    if (!match) {
-      return 0;
-    }
-
-    const number =
-      parseInt(
-        match[1],
-        10
-      );
-
-    if (
-      Number.isNaN(
-        number
-      )
-    ) {
-      return 0;
-    }
-
-    return clamp(
-      number - 1,
+    const nextIndex = Math.max(
       0,
-      scenes.length - 1
+      Math.min(index, sceneCount - 1)
     );
-  }
 
-
-  /* =====================================================
-     WHEEL
-  ===================================================== */
-
-  function handleWheel(
-    event
-  ) {
-
-    if (
-      isDragging ||
-      isAnimating
-    ) {
-      return;
-    }
-
-    const delta =
-      Math.abs(
-        event.deltaX
-      ) >
-      Math.abs(
-        event.deltaY
-      )
-        ? event.deltaX
-        : event.deltaY;
-
-    if (
-      Math.abs(
-        delta
-      ) < 18
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-
-    if (wheelLocked) {
-      return;
-    }
-
-    wheelLocked =
-      true;
-
-    if (delta > 0) {
-
-      goTo(
-        currentIndex + 1
-      );
-
-    } else {
-
-      goTo(
-        currentIndex - 1
-      );
-    }
-
-    setTimeout(
-      () => {
-
-        wheelLocked =
-          false;
-
-      },
-      850
-    );
-  }
-
-
-  if (experience) {
-
-    experience.addEventListener(
-      "wheel",
-      handleWheel,
-      {
-        passive: false
-      }
-    );
-  }
-
-
-  /* =====================================================
-     POINTER DRAG
-  ===================================================== */
-
-  function handlePointerDown(
-    event
-  ) {
-
-    if (
-      event.pointerType ===
-        "mouse" &&
-      event.button !== 0
-    ) {
+    if (nextIndex === sceneIndex) {
       return;
     }
 
@@ -1789,370 +862,461 @@
       return;
     }
 
-    isDragging =
-      true;
+    isAnimating = animate;
 
-    pointerStartX =
-      event.clientX;
+    soundTransition();
 
-    pointerCurrentX =
-      event.clientX;
+    sceneIndex = nextIndex;
 
-    dragStartTranslate =
-      getTargetTranslate(
-        currentIndex
+    applyScene(sceneIndex, animate);
+
+    if (animate) {
+      setTimeout(() => {
+        isAnimating = false;
+      }, 760);
+    } else {
+      isAnimating = false;
+    }
+
+    updateHash();
+  }
+
+  function updateHash() {
+    try {
+      history.replaceState(
+        null,
+        "",
+        `#scene-${sceneIndex + 1}`
+      );
+    } catch (_) {}
+  }
+
+  function readHash() {
+    const match =
+      window.location.hash.match(
+        /scene-(\d+)/i
       );
 
-    dragTranslate =
-      dragStartTranslate;
+    if (!match) return 0;
 
-    track.classList.add(
-      "is-dragging"
-    );
+    const number = parseInt(match[1], 10);
 
-    experience.setPointerCapture(
-      event.pointerId
+    if (!Number.isFinite(number)) {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      Math.min(number - 1, sceneCount - 1)
     );
   }
 
+  /* =========================================================
+     WHEEL
+     ========================================================= */
 
-  function handlePointerMove(
-    event
-  ) {
+  function handleWheel(event) {
+    event.preventDefault();
 
-    if (!isDragging) {
+    if (wheelLock || isAnimating) {
       return;
     }
 
-    pointerCurrentX =
-      event.clientX;
+    const delta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+
+    if (Math.abs(delta) < 10) {
+      return;
+    }
+
+    wheelLock = true;
+
+    if (delta > 0) {
+      goToScene(sceneIndex + 1);
+    } else {
+      goToScene(sceneIndex - 1);
+    }
+
+    setTimeout(() => {
+      wheelLock = false;
+    }, 800);
+  }
+
+  window.addEventListener(
+    "wheel",
+    handleWheel,
+    { passive: false }
+  );
+
+  /* =========================================================
+     POINTER DRAG
+     ========================================================= */
+
+  function pointerDown(event) {
+    if (
+      event.target.closest("a") ||
+      event.target.closest("button")
+    ) {
+      return;
+    }
+
+    isDragging = true;
+    dragStartX = event.clientX;
+    dragCurrentX = event.clientX;
+    dragStartScene = sceneIndex;
+
+    if (track) {
+      track.style.transition = "none";
+    }
+  }
+
+  function pointerMove(event) {
+    if (!isDragging || !track) {
+      return;
+    }
+
+    dragCurrentX = event.clientX;
 
     const delta =
-      pointerCurrentX -
-      pointerStartX;
+      dragCurrentX - dragStartX;
 
-    const resistance =
-      0.92;
+    const viewportWidth =
+      window.innerWidth;
 
-    dragTranslate =
-      dragStartTranslate +
-      delta *
-      resistance;
+    const base =
+      dragStartScene * viewportWidth;
 
-    const maxTranslate =
-      0;
+    const position =
+      base - delta;
 
-    const minTranslate =
-      -(
-        (
-          scenes.length - 1
-        ) *
-        window.innerWidth
+    const maxPosition =
+      (sceneCount - 1) * viewportWidth;
+
+    const clamped =
+      Math.max(
+        0,
+        Math.min(position, maxPosition)
       );
-
-    if (
-      dragTranslate >
-      maxTranslate
-    ) {
-
-      dragTranslate =
-        lerp(
-          maxTranslate,
-          dragTranslate,
-          0.35
-        );
-    }
-
-    if (
-      dragTranslate <
-      minTranslate
-    ) {
-
-      dragTranslate =
-        lerp(
-          minTranslate,
-          dragTranslate,
-          0.35
-        );
-    }
 
     track.style.transform =
-      `translate3d(${dragTranslate}px,0,0)`;
+      `translate3d(-${clamped}px, 0, 0)`;
   }
 
-
-  function handlePointerUp(
-    event
-  ) {
-
+  function pointerUp() {
     if (!isDragging) {
       return;
     }
 
-    isDragging =
-      false;
-
-    track.classList.remove(
-      "is-dragging"
-    );
-
-    try {
-
-      experience.releasePointerCapture(
-        event.pointerId
-      );
-
-    } catch (_) {}
+    isDragging = false;
 
     const delta =
-      pointerCurrentX -
-      pointerStartX;
+      dragCurrentX - dragStartX;
 
     const threshold =
       Math.min(
-        window.innerWidth *
-          0.18,
-        150
+        window.innerWidth * 0.16,
+        180
       );
 
-    if (
-      Math.abs(
-        delta
-      ) >
-      threshold
-    ) {
-
+    if (Math.abs(delta) > threshold) {
       if (delta < 0) {
-
-        goTo(
-          currentIndex + 1
-        );
-
+        goToScene(dragStartScene + 1);
       } else {
-
-        goTo(
-          currentIndex - 1
-        );
+        goToScene(dragStartScene - 1);
       }
+    } else {
+      applyScene(sceneIndex, true);
+    }
+  }
 
+  window.addEventListener(
+    "pointerdown",
+    pointerDown,
+    { passive: true }
+  );
+
+  window.addEventListener(
+    "pointermove",
+    pointerMove,
+    { passive: true }
+  );
+
+  window.addEventListener(
+    "pointerup",
+    pointerUp,
+    { passive: true }
+  );
+
+  window.addEventListener(
+    "pointercancel",
+    pointerUp,
+    { passive: true }
+  );
+
+  /* =========================================================
+     TOUCH
+     ========================================================= */
+
+  function touchStart(event) {
+    if (!event.touches.length) return;
+
+    const touch =
+      event.touches[0];
+
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+  }
+
+  function touchEnd(event) {
+    if (!event.changedTouches.length) {
       return;
     }
 
-    activateScene(
-      currentIndex,
-      true,
-      false
-    );
+    const touch =
+      event.changedTouches[0];
+
+    const deltaX =
+      touch.clientX - touchStartX;
+
+    const deltaY =
+      touch.clientY - touchStartY;
+
+    if (Math.abs(deltaX) < 35) {
+      return;
+    }
+
+    if (
+      Math.abs(deltaX) <=
+      Math.abs(deltaY)
+    ) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      goToScene(sceneIndex + 1);
+    } else {
+      goToScene(sceneIndex - 1);
+    }
   }
 
+  window.addEventListener(
+    "touchstart",
+    touchStart,
+    { passive: true }
+  );
 
-  if (experience) {
+  window.addEventListener(
+    "touchend",
+    touchEnd,
+    { passive: true }
+  );
 
-    experience.addEventListener(
-      "pointerdown",
-      handlePointerDown
-    );
-
-    experience.addEventListener(
-      "pointermove",
-      handlePointerMove
-    );
-
-    experience.addEventListener(
-      "pointerup",
-      handlePointerUp
-    );
-
-    experience.addEventListener(
-      "pointercancel",
-      handlePointerUp
-    );
-  }
-
-
-  /* =====================================================
+  /* =========================================================
      KEYBOARD
-  ===================================================== */
+     ========================================================= */
+
+  function handleKeyboard(event) {
+    if (
+      event.target &&
+      (
+        event.target.tagName === "INPUT" ||
+        event.target.tagName === "TEXTAREA"
+      )
+    ) {
+      return;
+    }
+
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        event.preventDefault();
+        goToScene(sceneIndex + 1);
+        break;
+
+      case "ArrowLeft":
+      case "ArrowUp":
+        event.preventDefault();
+        goToScene(sceneIndex - 1);
+        break;
+
+      case "Home":
+        event.preventDefault();
+        goToScene(0);
+        break;
+
+      case "End":
+        event.preventDefault();
+        goToScene(sceneCount - 1);
+        break;
+
+      case "Escape":
+        if (menu) {
+          menu.classList.remove("open");
+        }
+        break;
+    }
+  }
 
   window.addEventListener(
     "keydown",
-    (event) => {
-
-      if (
-        event.key ===
-        "ArrowRight"
-      ) {
-
-        event.preventDefault();
-
-        goTo(
-          currentIndex + 1
-        );
-      }
-
-      if (
-        event.key ===
-        "ArrowLeft"
-      ) {
-
-        event.preventDefault();
-
-        goTo(
-          currentIndex - 1
-        );
-      }
-
-      if (
-        event.key ===
-        "Home"
-      ) {
-
-        event.preventDefault();
-
-        goTo(0);
-      }
-
-      if (
-        event.key ===
-        "End"
-      ) {
-
-        event.preventDefault();
-
-        goTo(
-          scenes.length - 1
-        );
-      }
-
-      if (
-        event.key ===
-        "Escape"
-      ) {
-
-        closeMobileMenu();
-      }
-    }
+    handleKeyboard
   );
 
-
-  /* =====================================================
+  /* =========================================================
      MOBILE MENU
-  ===================================================== */
+     ========================================================= */
 
-  function openMobileMenu() {
-
-    if (!mobileMenu) {
-      return;
-    }
-
-    mobileMenu.classList.add(
-      "is-open"
-    );
-
-    if (menuButton) {
-
-      menuButton.classList.add(
-        "is-open"
-      );
-    }
-  }
-
-
-  function closeMobileMenu() {
-
-    if (!mobileMenu) {
-      return;
-    }
-
-    mobileMenu.classList.remove(
-      "is-open"
-    );
-
-    if (menuButton) {
-
-      menuButton.classList.remove(
-        "is-open"
-      );
-    }
-  }
-
-
-  if (menuButton) {
-
+  if (menuButton && menu) {
     menuButton.addEventListener(
       "click",
-      () => {
+      (event) => {
+        event.stopPropagation();
 
-        if (
-          mobileMenu.classList.contains(
-            "is-open"
-          )
-        ) {
+        unlockAudio();
 
-          closeMobileMenu();
-
-        } else {
-
-          openMobileMenu();
-        }
-
+        menu.classList.toggle("open");
       }
     );
   }
 
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!menu || !menuButton) {
+        return;
+      }
 
-  mobileButtons.forEach(
-    (button) => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const index =
-            parseInt(
-              button.dataset.go,
-              10
-            );
-
-          closeMobileMenu();
-
-          goTo(index);
-
-        }
-      );
-
+      if (
+        menu.classList.contains("open") &&
+        !menu.contains(event.target) &&
+        !menuButton.contains(event.target)
+      ) {
+        menu.classList.remove("open");
+      }
     }
   );
 
+  /* =========================================================
+     NETWORK
+     ========================================================= */
 
-  /* =====================================================
+  const networkSvg =
+    document.querySelector(".network-svg");
+
+  const networkNodes =
+    [...document.querySelectorAll(".network-node")];
+
+  const networkSignals =
+    [...document.querySelectorAll(".network-signal")];
+
+  let networkAnimationFrame = null;
+  let networkStartTime = performance.now();
+
+  function animateNetwork(time) {
+    if (!networkSvg) {
+      return;
+    }
+
+    const elapsed =
+      (time - networkStartTime) / 1000;
+
+    networkSignals.forEach((signal, index) => {
+      const path =
+        document.querySelector(
+          `.network-line[data-index="${index}"]`
+        );
+
+      if (!path) return;
+
+      const length =
+        path.getTotalLength();
+
+      const speed =
+        0.16 + index * 0.025;
+
+      const progress =
+        (elapsed * speed) % 1;
+
+      const point =
+        path.getPointAtLength(
+          progress * length
+        );
+
+      signal.setAttribute(
+        "cx",
+        point.x
+      );
+
+      signal.setAttribute(
+        "cy",
+        point.y
+      );
+    });
+
+    if (
+      sceneIndex === 6 &&
+      elapsed > 0.2
+    ) {
+      soundNetwork();
+    }
+
+    networkAnimationFrame =
+      requestAnimationFrame(
+        animateNetwork
+      );
+  }
+
+  if (networkSvg) {
+    networkAnimationFrame =
+      requestAnimationFrame(
+        animateNetwork
+      );
+  }
+
+  /* =========================================================
+     PARALLAX
+     ========================================================= */
+
+  const images =
+    [...document.querySelectorAll(".media-frame img")];
+
+  function applyParallax(event) {
+    if (!window.matchMedia("(min-width: 1100px)").matches) {
+      return;
+    }
+
+    const x =
+      (event.clientX / window.innerWidth - 0.5);
+
+    const y =
+      (event.clientY / window.innerHeight - 0.5);
+
+    images.forEach((image) => {
+      image.style.transform =
+        `scale(1.01) translate3d(${x * 5}px, ${y * 3}px, 0)`;
+    });
+  }
+
+  window.addEventListener(
+    "pointermove",
+    applyParallax,
+    { passive: true }
+  );
+
+  /* =========================================================
      RESIZE
-  ===================================================== */
+     ========================================================= */
 
   let resizeTimer = null;
 
   function handleResize() {
+    clearTimeout(resizeTimer);
 
-    clearTimeout(
-      resizeTimer
-    );
-
-    resizeTimer =
-      setTimeout(
-        () => {
-
-          applyTranslate(
-            getTargetTranslate(
-              currentIndex
-            ),
-            false
-          );
-
-          updateNetworkGeometry();
-
-        },
-        100
-      );
+    resizeTimer = setTimeout(() => {
+      applyScene(sceneIndex, false);
+    }, 120);
   }
 
   window.addEventListener(
@@ -2160,523 +1324,29 @@
     handleResize
   );
 
-
-  /* =====================================================
-     NETWORK
-  ===================================================== */
-
-  const controlNetwork =
-    document.getElementById(
-      "controlNetwork"
-    );
-
-  const centralControl =
-    document.getElementById(
-      "centralControl"
-    );
-
-  const nodes = [
-    ...document.querySelectorAll(
-      ".network-node"
-    )
-  ];
-
-  const lines = [
-    document.getElementById(
-      "line1"
-    ),
-    document.getElementById(
-      "line2"
-    ),
-    document.getElementById(
-      "line3"
-    ),
-    document.getElementById(
-      "line4"
-    )
-  ];
-
-  const signals = [
-    document.getElementById(
-      "signal1"
-    ),
-    document.getElementById(
-      "signal2"
-    ),
-    document.getElementById(
-      "signal3"
-    ),
-    document.getElementById(
-      "signal4"
-    )
-  ];
-
-
-  function getElementCenter(
-    element,
-    parentRect
-  ) {
-
-    const rect =
-      element.getBoundingClientRect();
-
-    return {
-
-      x:
-        (
-          (
-            rect.left +
-            rect.width / 2
-          ) -
-          parentRect.left
-        ) /
-        parentRect.width *
-        1000,
-
-      y:
-        (
-          (
-            rect.top +
-            rect.height / 2
-          ) -
-          parentRect.top
-        ) /
-        parentRect.height *
-        620
-    };
-  }
-
-
-  function updateNetworkGeometry() {
-
-    if (
-      !controlNetwork ||
-      !centralControl ||
-      nodes.length !== 4
-    ) {
-      return;
-    }
-
-    const parentRect =
-      controlNetwork.getBoundingClientRect();
-
-    const center =
-      getElementCenter(
-        centralControl,
-        parentRect
-      );
-
-    nodes.forEach(
-      (
-        node,
-        index
-      ) => {
-
-        const point =
-          getElementCenter(
-            node,
-            parentRect
-          );
-
-        const line =
-          lines[index];
-
-        const signal =
-          signals[index];
-
-        if (
-          !line ||
-          !signal
-        ) {
-          return;
-        }
-
-        line.setAttribute(
-          "x1",
-          point.x
-        );
-
-        line.setAttribute(
-          "y1",
-          point.y
-        );
-
-        line.setAttribute(
-          "x2",
-          center.x
-        );
-
-        line.setAttribute(
-          "y2",
-          center.y
-        );
-
-        signal.setAttribute(
-          "cx",
-          point.x
-        );
-
-        signal.setAttribute(
-          "cy",
-          point.y
-        );
-      }
-    );
-  }
-
-
-  function startNetworkAnimation() {
-
-    stopNetworkAnimation();
-
-    updateNetworkGeometry();
-
-    let index = 0;
-
-    networkTimer =
-      setInterval(
-        () => {
-
-          nodes.forEach(
-            (node) => {
-
-              node.classList.remove(
-                "is-live"
-              );
-            }
-          );
-
-          signals.forEach(
-            (signal) => {
-
-              signal.style.opacity =
-                "0";
-            }
-          );
-
-          const node =
-            nodes[index];
-
-          const signal =
-            signals[index];
-
-          const line =
-            lines[index];
-
-          if (node) {
-
-            node.classList.add(
-              "is-live"
-            );
-          }
-
-          if (signal) {
-
-            signal.style.opacity =
-              "1";
-          }
-
-          if (line) {
-
-            line.style.stroke =
-              "rgba(199,168,106,.95)";
-
-            line.style.strokeWidth =
-              "2";
-
-            setTimeout(
-              () => {
-
-                line.style.stroke =
-                  "rgba(199,168,106,.25)";
-
-                line.style.strokeWidth =
-                  "1";
-
-              },
-              550
-            );
-          }
-
-          /*
-           * Звуковой сигнал узла.
-           * Не повторяем один и тот же сигнал слишком быстро.
-           */
-
-          if (
-            index !==
-            lastNetworkSound
-          ) {
-
-            soundNetworkSignal(
-              index
-            );
-
-            lastNetworkSound =
-              index;
-
-          } else {
-
-            soundNetworkCenter();
-          }
-
-          index =
-            (
-              index + 1
-            ) %
-            nodes.length;
-
-        },
-        720
-      );
-  }
-
-
-  function stopNetworkAnimation() {
-
-    if (networkTimer) {
-
-      clearInterval(
-        networkTimer
-      );
-
-      networkTimer =
-        null;
-    }
-
-    lastNetworkSound =
-      -1;
-
-    nodes.forEach(
-      (node) => {
-
-        node.classList.remove(
-          "is-live"
-        );
-      }
-    );
-
-    signals.forEach(
-      (signal) => {
-
-        signal.style.opacity =
-          "0";
-      }
-    );
-
-    lines.forEach(
-      (line) => {
-
-        if (!line) {
-          return;
-        }
-
-        line.style.stroke =
-          "rgba(199,168,106,.25)";
-
-        line.style.strokeWidth =
-          "1";
-      }
-    );
-  }
-
-
-  /* =====================================================
-     PARALLAX
-  ===================================================== */
-
-  function handleParallax(
-    event
-  ) {
-
-    if (
-      window.innerWidth <=
-        760 ||
-      isDragging
-    ) {
-      return;
-    }
-
-    const activeScene =
-      scenes[currentIndex];
-
-    if (!activeScene) {
-      return;
-    }
-
-    const frame =
-      activeScene.querySelector(
-        ".media-frame"
-      );
-
-    const image =
-      activeScene.querySelector(
-        ".media-frame img"
-      );
-
-    if (
-      !frame ||
-      !image
-    ) {
-      return;
-    }
-
-    const rect =
-      frame.getBoundingClientRect();
-
-    if (
-      event.clientX <
-        rect.left ||
-      event.clientX >
-        rect.right ||
-      event.clientY <
-        rect.top ||
-      event.clientY >
-        rect.bottom
-    ) {
-      return;
-    }
-
-    const x =
-      (
-        event.clientX -
-        rect.left
-      ) /
-      rect.width -
-      0.5;
-
-    const y =
-      (
-        event.clientY -
-        rect.top
-      ) /
-      rect.height -
-      0.5;
-
-    image.style.transform =
-      `scale(1.025) translate(${x * -8}px, ${y * -5}px)`;
-  }
-
-
-  if (experience) {
-
-    experience.addEventListener(
-      "pointermove",
-      handleParallax
-    );
-  }
-
-
-  /* =====================================================
-     PREVENT NATIVE GESTURES
-  ===================================================== */
-
-  document.addEventListener(
-    "gesturestart",
-    (event) => {
-
-      event.preventDefault();
-
-    },
-    {
-      passive: false
-    }
-  );
-
-  document.addEventListener(
-    "gesturechange",
-    (event) => {
-
-      event.preventDefault();
-
-    },
-    {
-      passive: false
-    }
-  );
-
-  document.addEventListener(
-    "gestureend",
-    (event) => {
-
-      event.preventDefault();
-
-    },
-    {
-      passive: false
-    }
-  );
-
-
-  /* =====================================================
+  /* =========================================================
      INIT
-  ===================================================== */
+     ========================================================= */
 
-  if (site) {
+  function init() {
+    sceneCount = scenes.length;
 
-    site.style.visibility =
-      "visible";
-  }
-
-  createSoundControl();
-
-  const initialScene =
-    readHash();
-
-  scenes.forEach(
-    (
-      scene,
-      index
-    ) => {
-
-      scene.classList.toggle(
-        "is-active",
-        index === initialScene
-      );
-
+    if (progressTotal) {
+      progressTotal.textContent =
+        String(sceneCount).padStart(2, "0");
     }
-  );
 
-  applyTranslate(
-    getTargetTranslate(
-      initialScene
-    ),
-    false
-  );
+    createSoundControl();
 
-  if (progressCurrent) {
+    sceneIndex = readHash();
 
-    progressCurrent.textContent =
-      formatScene(
-        initialScene
-      );
+    applyScene(
+      sceneIndex,
+      false
+    );
+
+    runLoader();
   }
 
-  if (progressFill) {
-
-    progressFill.style.width =
-      `${
-        (
-          (
-            initialScene + 1
-          ) /
-          scenes.length
-        ) * 100
-      }%`;
-  }
-
-  updateNetworkGeometry();
-
-  setTimeout(
-    updateNetworkGeometry,
-    100
-  );
-
-  setTimeout(
-    updateNetworkGeometry,
-    700
-  );
-
-  startLoader();
-
+  init();
 })();
