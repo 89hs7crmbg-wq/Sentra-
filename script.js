@@ -1,6 +1,7 @@
 (() => {
   "use strict";
 
+
   /* =====================================================
      ELEMENTS
   ===================================================== */
@@ -8,25 +9,40 @@
   const loader = document.getElementById("loader");
   const loaderProgress = document.getElementById("loaderProgress");
   const loaderPercent = document.getElementById("loaderPercent");
-  const loaderChecks = [...document.querySelectorAll(".loader-check")];
+  const loaderChecks = [
+    ...document.querySelectorAll(".loader-check")
+  ];
   const loaderFinal = document.getElementById("loaderFinal");
 
   const site = document.getElementById("site");
   const experience = document.getElementById("experience");
   const track = document.getElementById("track");
 
-  const scenes = [...document.querySelectorAll(".scene")];
+  const scenes = [
+    ...document.querySelectorAll(".scene")
+  ];
 
-  const liveDate = document.getElementById("liveDate");
-  const liveTime = document.getElementById("liveTime");
+  const liveDate =
+    document.getElementById("liveDate");
 
-  const progressCurrent = document.getElementById("progressCurrent");
-  const progressFill = document.getElementById("progressFill");
+  const liveTime =
+    document.getElementById("liveTime");
 
-  const navigationHint = document.getElementById("navigationHint");
+  const progressCurrent =
+    document.getElementById("progressCurrent");
 
-  const menuButton = document.getElementById("menuButton");
-  const mobileMenu = document.getElementById("mobileMenu");
+  const progressFill =
+    document.getElementById("progressFill");
+
+  const navigationHint =
+    document.getElementById("navigationHint");
+
+  const menuButton =
+    document.getElementById("menuButton");
+
+  const mobileMenu =
+    document.getElementById("mobileMenu");
+
   const mobileButtons = [
     ...document.querySelectorAll("[data-go]")
   ];
@@ -58,13 +74,26 @@
      UTILITIES
   ===================================================== */
 
-  const clamp = (value, min, max) => {
-    return Math.min(Math.max(value, min), max);
+  const clamp = (
+    value,
+    min,
+    max
+  ) => {
+    return Math.min(
+      Math.max(value, min),
+      max
+    );
   };
 
-  const lerp = (a, b, amount) => {
+
+  const lerp = (
+    a,
+    b,
+    amount
+  ) => {
     return a + (b - a) * amount;
   };
+
 
   const formatScene = (index) => {
     return String(index + 1).padStart(2, "0");
@@ -72,31 +101,41 @@
 
 
   /* =====================================================
-     LIVE DATE / TIME
+     CLOCK
   ===================================================== */
 
   function updateClock() {
+
     const now = new Date();
 
-    const date = new Intl.DateTimeFormat("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    }).format(now);
+    liveDate.textContent =
+      new Intl.DateTimeFormat(
+        "ru-RU",
+        {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric"
+        }
+      ).format(now);
 
-    const time = new Intl.DateTimeFormat("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false
-    }).format(now);
-
-    liveDate.textContent = date;
-    liveTime.textContent = time;
+    liveTime.textContent =
+      new Intl.DateTimeFormat(
+        "ru-RU",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }
+      ).format(now);
   }
 
   updateClock();
-  setInterval(updateClock, 1000);
+
+  setInterval(
+    updateClock,
+    1000
+  );
 
 
   /* =====================================================
@@ -104,30 +143,55 @@
   ===================================================== */
 
   function setLoaderProgress(value) {
-    const safeValue = clamp(value, 0, 100);
 
-    loaderProgress.style.width = `${safeValue}%`;
+    const safeValue =
+      clamp(value, 0, 100);
+
+    loaderProgress.style.width =
+      `${safeValue}%`;
+
     loaderPercent.textContent =
-      `${String(Math.round(safeValue)).padStart(2, "0")}%`;
+      `${String(
+        Math.round(safeValue)
+      ).padStart(2, "0")}%`;
   }
+
 
   function setLoaderStep(index) {
-    loaderChecks.forEach((item, itemIndex) => {
 
-      item.classList.remove("is-active");
+    loaderChecks.forEach(
+      (item, itemIndex) => {
 
-      if (itemIndex < index) {
-        item.classList.add("is-done");
-        item.querySelector("strong").textContent = "ОК";
+        item.classList.remove(
+          "is-active"
+        );
+
+        if (itemIndex < index) {
+
+          item.classList.add(
+            "is-done"
+          );
+
+          item.querySelector(
+            "strong"
+          ).textContent = "ОК";
+        }
+
+        if (itemIndex === index) {
+
+          item.classList.add(
+            "is-active"
+          );
+
+          item.querySelector(
+            "strong"
+          ).textContent = "ПРОВЕРКА";
+        }
+
       }
-
-      if (itemIndex === index) {
-        item.classList.add("is-active");
-        item.querySelector("strong").textContent = "ПРОВЕРКА";
-      }
-
-    });
+    );
   }
+
 
   function finishLoader() {
 
@@ -137,31 +201,54 @@
 
     loaderFinished = true;
 
-    loaderChecks.forEach((item) => {
-      item.classList.remove("is-active");
-      item.classList.add("is-done");
+    loaderChecks.forEach(
+      (item) => {
 
-      const status = item.querySelector("strong");
+        item.classList.remove(
+          "is-active"
+        );
 
-      if (status) {
-        status.textContent = "ОК";
+        item.classList.add(
+          "is-done"
+        );
+
+        item.querySelector(
+          "strong"
+        ).textContent = "ОК";
+
       }
-    });
+    );
 
     setLoaderProgress(100);
 
-    loaderFinal.classList.add("is-visible");
+    loaderFinal.classList.add(
+      "is-visible"
+    );
 
-    setTimeout(() => {
-      loader.classList.add("is-hidden");
+    setTimeout(
+      () => {
 
-      setTimeout(() => {
-        loader.remove();
-      }, 900);
+        loader.classList.add(
+          "is-hidden"
+        );
 
-      activateScene(0, false);
-    }, 750);
+        setTimeout(
+          () => {
+            loader.remove();
+          },
+          900
+        );
+
+        activateScene(
+          0,
+          false
+        );
+
+      },
+      750
+    );
   }
+
 
   function startLoader() {
 
@@ -176,31 +263,46 @@
 
     function animateLoader(now) {
 
-      const elapsed = now - start;
-      const progress = clamp(
-        (elapsed / duration) * 100,
-        0,
-        100
+      const elapsed =
+        now - start;
+
+      const progress =
+        clamp(
+          (elapsed / duration) * 100,
+          0,
+          100
+        );
+
+      setLoaderProgress(
+        progress
       );
 
-      setLoaderProgress(progress);
-
-      const step = Math.min(
-        loaderChecks.length - 1,
-        Math.floor((progress / 100) * loaderChecks.length)
-      );
+      const step =
+        Math.min(
+          loaderChecks.length - 1,
+          Math.floor(
+            (progress / 100) *
+            loaderChecks.length
+          )
+        );
 
       setLoaderStep(step);
 
       if (progress >= 100) {
+
         finishLoader();
+
         return;
       }
 
-      requestAnimationFrame(animateLoader);
+      requestAnimationFrame(
+        animateLoader
+      );
     }
 
-    requestAnimationFrame(animateLoader);
+    requestAnimationFrame(
+      animateLoader
+    );
   }
 
 
@@ -209,14 +311,26 @@
   ===================================================== */
 
   function getTargetTranslate(index) {
-    return -(index * window.innerWidth);
+
+    return -(
+      index *
+      window.innerWidth
+    );
   }
 
-  function applyTranslate(value, animate = true) {
+
+  function applyTranslate(
+    value,
+    animate = true
+  ) {
 
     if (!animate) {
-      track.style.transition = "none";
+
+      track.style.transition =
+        "none";
+
     } else {
+
       track.style.transition =
         "transform .85s cubic-bezier(.22,.61,.36,1)";
     }
@@ -225,21 +339,34 @@
       `translate3d(${value}px,0,0)`;
 
     if (!animate) {
-      requestAnimationFrame(() => {
-        track.style.transition =
-          "transform .85s cubic-bezier(.22,.61,.36,1)";
-      });
+
+      requestAnimationFrame(
+        () => {
+
+          track.style.transition =
+            "transform .85s cubic-bezier(.22,.61,.36,1)";
+
+        }
+      );
     }
   }
 
 
   /* =====================================================
-     SCENE ACTIVATION
+     SCENE
   ===================================================== */
 
-  function activateScene(index, animate = true) {
+  function activateScene(
+    index,
+    animate = true
+  ) {
 
-    index = clamp(index, 0, scenes.length - 1);
+    index =
+      clamp(
+        index,
+        0,
+        scenes.length - 1
+      );
 
     currentIndex = index;
 
@@ -248,12 +375,16 @@
       animate
     );
 
-    scenes.forEach((scene, sceneIndex) => {
-      scene.classList.toggle(
-        "is-active",
-        sceneIndex === index
-      );
-    });
+    scenes.forEach(
+      (scene, sceneIndex) => {
+
+        scene.classList.toggle(
+          "is-active",
+          sceneIndex === index
+        );
+
+      }
+    );
 
     progressCurrent.textContent =
       formatScene(index);
@@ -262,14 +393,24 @@
       `${((index + 1) / scenes.length) * 100}%`;
 
     if (index > 0) {
-      navigationHint.classList.add("is-hidden");
+
+      navigationHint.classList.add(
+        "is-hidden"
+      );
+
     } else {
-      navigationHint.classList.remove("is-hidden");
+
+      navigationHint.classList.remove(
+        "is-hidden"
+      );
     }
 
     if (index === 6) {
+
       startNetworkAnimation();
+
     } else {
+
       stopNetworkAnimation();
     }
 
@@ -279,27 +420,39 @@
 
   function goTo(index) {
 
-    if (isAnimating || isDragging) {
+    if (
+      isAnimating ||
+      isDragging
+    ) {
       return;
     }
 
-    const target = clamp(
-      index,
-      0,
-      scenes.length - 1
-    );
+    const target =
+      clamp(
+        index,
+        0,
+        scenes.length - 1
+      );
 
-    if (target === currentIndex) {
+    if (
+      target === currentIndex
+    ) {
       return;
     }
 
     isAnimating = true;
 
-    activateScene(target, true);
+    activateScene(
+      target,
+      true
+    );
 
-    setTimeout(() => {
-      isAnimating = false;
-    }, 900);
+    setTimeout(
+      () => {
+        isAnimating = false;
+      },
+      900
+    );
   }
 
 
@@ -309,12 +462,19 @@
 
   function updateHash(index) {
 
-    const hash = `#scene-${index + 1}`;
+    const hash =
+      `#scene-${index + 1}`;
 
     if (history.replaceState) {
-      history.replaceState(null, "", hash);
+
+      history.replaceState(
+        null,
+        "",
+        hash
+      );
     }
   }
+
 
   function readHash() {
 
@@ -327,10 +487,11 @@
       return 0;
     }
 
-    const number = parseInt(
-      match[1],
-      10
-    );
+    const number =
+      parseInt(
+        match[1],
+        10
+      );
 
     if (Number.isNaN(number)) {
       return 0;
@@ -350,16 +511,22 @@
 
   function handleWheel(event) {
 
-    if (isDragging || isAnimating) {
+    if (
+      isDragging ||
+      isAnimating
+    ) {
       return;
     }
 
     const delta =
-      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      Math.abs(event.deltaX) >
+      Math.abs(event.deltaY)
         ? event.deltaX
         : event.deltaY;
 
-    if (Math.abs(delta) < 18) {
+    if (
+      Math.abs(delta) < 18
+    ) {
       return;
     }
 
@@ -372,20 +539,33 @@
     wheelLocked = true;
 
     if (delta > 0) {
-      goTo(currentIndex + 1);
+
+      goTo(
+        currentIndex + 1
+      );
+
     } else {
-      goTo(currentIndex - 1);
+
+      goTo(
+        currentIndex - 1
+      );
     }
 
-    setTimeout(() => {
-      wheelLocked = false;
-    }, 850);
+    setTimeout(
+      () => {
+        wheelLocked = false;
+      },
+      850
+    );
   }
+
 
   experience.addEventListener(
     "wheel",
     handleWheel,
-    { passive: false }
+    {
+      passive: false
+    }
   );
 
 
@@ -393,9 +573,14 @@
      POINTER DRAG
   ===================================================== */
 
-  function handlePointerDown(event) {
+  function handlePointerDown(
+    event
+  ) {
 
-    if (event.pointerType === "mouse" && event.button !== 0) {
+    if (
+      event.pointerType === "mouse" &&
+      event.button !== 0
+    ) {
       return;
     }
 
@@ -405,15 +590,23 @@
 
     isDragging = true;
 
-    pointerStartX = event.clientX;
-    pointerCurrentX = event.clientX;
+    pointerStartX =
+      event.clientX;
+
+    pointerCurrentX =
+      event.clientX;
 
     dragStartTranslate =
-      getTargetTranslate(currentIndex);
+      getTargetTranslate(
+        currentIndex
+      );
 
-    dragTranslate = dragStartTranslate;
+    dragTranslate =
+      dragStartTranslate;
 
-    track.classList.add("is-dragging");
+    track.classList.add(
+      "is-dragging"
+    );
 
     experience.setPointerCapture(
       event.pointerId
@@ -421,16 +614,20 @@
   }
 
 
-  function handlePointerMove(event) {
+  function handlePointerMove(
+    event
+  ) {
 
     if (!isDragging) {
       return;
     }
 
-    pointerCurrentX = event.clientX;
+    pointerCurrentX =
+      event.clientX;
 
     const delta =
-      pointerCurrentX - pointerStartX;
+      pointerCurrentX -
+      pointerStartX;
 
     const resistance = .92;
 
@@ -439,10 +636,18 @@
       delta * resistance;
 
     const maxTranslate = 0;
-    const minTranslate =
-      -((scenes.length - 1) * window.innerWidth);
 
-    if (dragTranslate > maxTranslate) {
+    const minTranslate =
+      -(
+        (scenes.length - 1) *
+        window.innerWidth
+      );
+
+    if (
+      dragTranslate >
+      maxTranslate
+    ) {
+
       dragTranslate =
         lerp(
           maxTranslate,
@@ -451,7 +656,11 @@
         );
     }
 
-    if (dragTranslate < minTranslate) {
+    if (
+      dragTranslate <
+      minTranslate
+    ) {
+
       dragTranslate =
         lerp(
           minTranslate,
@@ -465,7 +674,9 @@
   }
 
 
-  function handlePointerUp(event) {
+  function handlePointerUp(
+    event
+  ) {
 
     if (!isDragging) {
       return;
@@ -473,16 +684,21 @@
 
     isDragging = false;
 
-    track.classList.remove("is-dragging");
+    track.classList.remove(
+      "is-dragging"
+    );
 
     try {
+
       experience.releasePointerCapture(
         event.pointerId
       );
+
     } catch (_) {}
 
     const delta =
-      pointerCurrentX - pointerStartX;
+      pointerCurrentX -
+      pointerStartX;
 
     const threshold =
       Math.min(
@@ -490,12 +706,22 @@
         150
       );
 
-    if (Math.abs(delta) > threshold) {
+    if (
+      Math.abs(delta) >
+      threshold
+    ) {
 
       if (delta < 0) {
-        goTo(currentIndex + 1);
+
+        goTo(
+          currentIndex + 1
+        );
+
       } else {
-        goTo(currentIndex - 1);
+
+        goTo(
+          currentIndex - 1
+        );
       }
 
       return;
@@ -537,27 +763,52 @@
     "keydown",
     (event) => {
 
-      if (event.key === "ArrowRight") {
+      if (
+        event.key === "ArrowRight"
+      ) {
+
         event.preventDefault();
-        goTo(currentIndex + 1);
+
+        goTo(
+          currentIndex + 1
+        );
       }
 
-      if (event.key === "ArrowLeft") {
+      if (
+        event.key === "ArrowLeft"
+      ) {
+
         event.preventDefault();
-        goTo(currentIndex - 1);
+
+        goTo(
+          currentIndex - 1
+        );
       }
 
-      if (event.key === "Home") {
+      if (
+        event.key === "Home"
+      ) {
+
         event.preventDefault();
+
         goTo(0);
       }
 
-      if (event.key === "End") {
+      if (
+        event.key === "End"
+      ) {
+
         event.preventDefault();
-        goTo(scenes.length - 1);
+
+        goTo(
+          scenes.length - 1
+        );
       }
 
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape"
+      ) {
+
         closeMobileMenu();
       }
 
@@ -570,14 +821,28 @@
   ===================================================== */
 
   function openMobileMenu() {
-    mobileMenu.classList.add("is-open");
-    menuButton.classList.add("is-open");
+
+    mobileMenu.classList.add(
+      "is-open"
+    );
+
+    menuButton.classList.add(
+      "is-open"
+    );
   }
 
+
   function closeMobileMenu() {
-    mobileMenu.classList.remove("is-open");
-    menuButton.classList.remove("is-open");
+
+    mobileMenu.classList.remove(
+      "is-open"
+    );
+
+    menuButton.classList.remove(
+      "is-open"
+    );
   }
+
 
   menuButton.addEventListener(
     "click",
@@ -588,8 +853,11 @@
           "is-open"
         )
       ) {
+
         closeMobileMenu();
+
       } else {
+
         openMobileMenu();
       }
 
@@ -597,25 +865,28 @@
   );
 
 
-  mobileButtons.forEach((button) => {
+  mobileButtons.forEach(
+    (button) => {
 
-    button.addEventListener(
-      "click",
-      () => {
+      button.addEventListener(
+        "click",
+        () => {
 
-        const index =
-          parseInt(
-            button.dataset.go,
-            10
-          );
+          const index =
+            parseInt(
+              button.dataset.go,
+              10
+            );
 
-        closeMobileMenu();
-        goTo(index);
+          closeMobileMenu();
 
-      }
-    );
+          goTo(index);
 
-  });
+        }
+      );
+
+    }
+  );
 
 
   /* =====================================================
@@ -626,19 +897,26 @@
 
   function handleResize() {
 
-    clearTimeout(resizeTimer);
+    clearTimeout(
+      resizeTimer
+    );
 
-    resizeTimer = setTimeout(() => {
+    resizeTimer =
+      setTimeout(
+        () => {
 
-      applyTranslate(
-        getTargetTranslate(currentIndex),
-        false
+          applyTranslate(
+            getTargetTranslate(
+              currentIndex
+            ),
+            false
+          );
+
+          updateNetworkGeometry();
+
+        },
+        100
       );
-
-      updateNetworkGeometry();
-
-    }, 100);
-
   }
 
   window.addEventListener(
@@ -648,7 +926,7 @@
 
 
   /* =====================================================
-     CONTROL NETWORK GEOMETRY
+     NETWORK
   ===================================================== */
 
   const controlNetwork =
@@ -691,19 +969,30 @@
       element.getBoundingClientRect();
 
     return {
+
       x:
-        ((rect.left + rect.width / 2) -
-          parentRect.left) /
+        (
+          (
+            rect.left +
+            rect.width / 2
+          ) -
+          parentRect.left
+        ) /
         parentRect.width *
         1000,
 
       y:
-        ((rect.top + rect.height / 2) -
-          parentRect.top) /
+        (
+          (
+            rect.top +
+            rect.height / 2
+          ) -
+          parentRect.top
+        ) /
         parentRect.height *
         620
-    };
 
+    };
   }
 
 
@@ -727,7 +1016,10 @@
       );
 
     nodes.forEach(
-      (node, index) => {
+      (
+        node,
+        index
+      ) => {
 
         const point =
           getElementCenter(
@@ -735,10 +1027,16 @@
             parentRect
           );
 
-        const line = lines[index];
-        const signal = signals[index];
+        const line =
+          lines[index];
 
-        if (!line || !signal) {
+        const signal =
+          signals[index];
+
+        if (
+          !line ||
+          !signal
+        ) {
           return;
         }
 
@@ -777,10 +1075,6 @@
   }
 
 
-  /* =====================================================
-     NETWORK ANIMATION
-  ===================================================== */
-
   function startNetworkAnimation() {
 
     stopNetworkAnimation();
@@ -790,83 +1084,111 @@
     let index = 0;
 
     networkTimer =
-      setInterval(() => {
+      setInterval(
+        () => {
 
-        nodes.forEach(
-          (node) => {
-            node.classList.remove(
+          nodes.forEach(
+            (node) => {
+
+              node.classList.remove(
+                "is-live"
+              );
+
+            }
+          );
+
+          signals.forEach(
+            (signal) => {
+
+              signal.style.opacity =
+                "0";
+
+            }
+          );
+
+          const node =
+            nodes[index];
+
+          const signal =
+            signals[index];
+
+          const line =
+            lines[index];
+
+          if (node) {
+
+            node.classList.add(
               "is-live"
             );
           }
-        );
 
-        signals.forEach(
-          (signal) => {
-            signal.style.opacity = "0";
+          if (signal) {
+
+            signal.style.opacity =
+              "1";
           }
-        );
 
-        const node =
-          nodes[index];
-
-        const signal =
-          signals[index];
-
-        const line =
-          lines[index];
-
-        if (node) {
-          node.classList.add(
-            "is-live"
-          );
-        }
-
-        if (signal) {
-          signal.style.opacity = "1";
-        }
-
-        if (line) {
-          line.style.stroke =
-            "rgba(199,168,106,.85)";
-
-          line.style.strokeWidth = "1.8";
-
-          setTimeout(() => {
+          if (line) {
 
             line.style.stroke =
-              "rgba(199,168,106,.25)";
+              "rgba(199,168,106,.95)";
 
-            line.style.strokeWidth = "1";
+            line.style.strokeWidth =
+              "2";
 
-          }, 650);
+            setTimeout(
+              () => {
 
-        }
+                line.style.stroke =
+                  "rgba(199,168,106,.25)";
 
-        index =
-          (index + 1) % nodes.length;
+                line.style.strokeWidth =
+                  "1";
 
-      }, 900);
+              },
+              550
+            );
+          }
+
+          index =
+            (
+              index + 1
+            ) %
+            nodes.length;
+
+        },
+        720
+      );
   }
 
 
   function stopNetworkAnimation() {
 
     if (networkTimer) {
-      clearInterval(networkTimer);
+
+      clearInterval(
+        networkTimer
+      );
+
       networkTimer = null;
     }
 
     nodes.forEach(
       (node) => {
+
         node.classList.remove(
           "is-live"
         );
+
       }
     );
 
     signals.forEach(
       (signal) => {
-        signal.style.opacity = "0";
+
+        signal.style.opacity =
+          "0";
+
       }
     );
 
@@ -880,17 +1202,21 @@
         line.style.stroke =
           "rgba(199,168,106,.25)";
 
-        line.style.strokeWidth = "1";
+        line.style.strokeWidth =
+          "1";
+
       }
     );
   }
 
 
   /* =====================================================
-     IMAGE PARALLAX
+     PARALLAX
   ===================================================== */
 
-  function handleParallax(event) {
+  function handleParallax(
+    event
+  ) {
 
     if (
       window.innerWidth <= 760 ||
@@ -916,7 +1242,10 @@
         ".media-frame img"
       );
 
-    if (!frame || !image) {
+    if (
+      !frame ||
+      !image
+    ) {
       return;
     }
 
@@ -933,18 +1262,25 @@
     }
 
     const x =
-      (event.clientX - rect.left) /
+      (
+        event.clientX -
+        rect.left
+      ) /
       rect.width -
       .5;
 
     const y =
-      (event.clientY - rect.top) /
+      (
+        event.clientY -
+        rect.top
+      ) /
       rect.height -
       .5;
 
     image.style.transform =
       `scale(1.025) translate(${x * -8}px, ${y * -5}px)`;
   }
+
 
   experience.addEventListener(
     "pointermove",
@@ -961,7 +1297,9 @@
     (event) => {
       event.preventDefault();
     },
-    { passive: false }
+    {
+      passive: false
+    }
   );
 
   document.addEventListener(
@@ -969,7 +1307,9 @@
     (event) => {
       event.preventDefault();
     },
-    { passive: false }
+    {
+      passive: false
+    }
   );
 
   document.addEventListener(
@@ -977,7 +1317,9 @@
     (event) => {
       event.preventDefault();
     },
-    { passive: false }
+    {
+      passive: false
+    }
   );
 
 
@@ -985,40 +1327,57 @@
      INIT
   ===================================================== */
 
-  site.style.visibility = "visible";
+  site.style.visibility =
+    "visible";
 
   const initialScene =
     readHash();
 
   scenes.forEach(
-    (scene, index) => {
+    (
+      scene,
+      index
+    ) => {
+
       scene.classList.toggle(
         "is-active",
         index === initialScene
       );
+
     }
   );
 
   applyTranslate(
-    getTargetTranslate(initialScene),
+    getTargetTranslate(
+      initialScene
+    ),
     false
   );
 
   progressCurrent.textContent =
-    formatScene(initialScene);
+    formatScene(
+      initialScene
+    );
 
   progressFill.style.width =
-    `${((initialScene + 1) / scenes.length) * 100}%`;
+    `${
+      (
+        (initialScene + 1) /
+        scenes.length
+      ) * 100
+    }%`;
 
   updateNetworkGeometry();
 
-  setTimeout(() => {
-    updateNetworkGeometry();
-  }, 100);
+  setTimeout(
+    updateNetworkGeometry,
+    100
+  );
 
-  setTimeout(() => {
-    updateNetworkGeometry();
-  }, 700);
+  setTimeout(
+    updateNetworkGeometry,
+    700
+  );
 
   startLoader();
 
