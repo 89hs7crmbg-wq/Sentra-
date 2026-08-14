@@ -1942,8 +1942,11 @@ a {
   }
 
   .scene {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
+
+    align-items: stretch;
+    justify-content: flex-start;
 
     gap: 20px;
 
@@ -1954,6 +1957,8 @@ a {
   }
 
   .scene-copy {
+    flex: 0 0 auto;
+    width: 100%;
     max-width: 90vw;
   }
 
@@ -1978,13 +1983,27 @@ a {
   }
 
   .scene-media {
+    position: relative;
+
+    flex: 1 1 0;
+
     width: 100%;
     max-width: none;
     max-height: none;
 
-    aspect-ratio: 4 / 3;
+    min-height: 0;
 
-    align-self: end;
+    aspect-ratio: auto;
+
+    align-self: stretch;
+  }
+
+  .scene-media > img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    object-position: center center;
   }
 
 
@@ -2053,6 +2072,28 @@ a {
   .scene-service .scene-copy {
     left: var(--side-padding);
     top: calc(var(--header-height) + 25px);
+  }
+
+  .scene-service .scene-media {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    min-height: 100%;
+    max-height: none;
+
+    aspect-ratio: auto;
+  }
+
+  .scene-service .scene-media > img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    object-position: center center;
   }
 
   .service-image-overlay {
