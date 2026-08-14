@@ -1,58 +1,47 @@
-"use strict";
+(() => {
+  "use strict";
+
+  const experience = document.getElementById("experience");
+  const scenes = [...document.querySelectorAll(".scene")];
+
+  const menu = document.getElementById("menu");
+  const menuButton = document.getElementById("menuButton");
+  const menuClose = document.getElementById("menuClose");
+  const menuItems = [...document.querySelectorAll(".menu-item")];
+
+  const clock = document.getElementById("clock");
+  const progressCurrent = document.getElementById("progressCurrent");
+  const progressFill = document.getElementById("progressFill");
+
+  const loader = document.getElementById("loader");
+  const loaderStatus = document.getElementById("loaderStatus");
+  const loaderProgressBar = document.getElementById("loaderProgressBar");
+  const loaderChecks = [...document.querySelectorAll(".loader-check")];
+  const loaderReady = document.querySelector(".loader-ready");
+
+  let currentScene = 0;
+  let isMoving = false;
+
+  let pointerDown = false;
+  let pointerStartX = 0;
+  let pointerLastX = 0;
+  let pointerMoved = false;
+
+  let wheelLocked = false;
+  let wheelAccumulator = 0;
+
+  let audioCtx = null;
+  let audioUnlocked = false;
+
+  let lastSceneSound = -1;
 
 
-/* =========================================
-   ELEMENTS
-========================================= */
+  /* =========================================
+     AUDIO
+  ========================================= */
 
-const loader = document.getElementById("loader");
-const loaderProgress = document.getElementById("loaderProgress");
-const loaderStatus = document.getElementById("loaderStatus");
-const loaderReady = document.getElementById("loaderReady");
-const checks = [...document.querySelectorAll(".check")];
-
-const experience = document.getElementById("experience");
-const track = document.getElementById("track");
-const scenes = [...document.querySelectorAll(".scene")];
-
-const currentSceneEl = document.getElementById("currentScene");
-const progressBar = document.getElementById("progressBar");
-
-const menu = document.getElementById("menu");
-const menuButton = document.getElementById("menuButton");
-const menuClose = document.getElementById("menuClose");
-const menuItems = [...document.querySelectorAll("[data-scene]")];
-
-const clock = document.getElementById("clock");
-
-
-/* =========================================
-   STATE
-========================================= */
-
-let currentScene = 0;
-let isDragging = false;
-let dragStartX = 0;
-let dragCurrentX = 0;
-let dragMoved = false;
-let wheelLocked = false;
-let wheelAccumulator = 0;
-let lastWheelTime = 0;
-
-
-/* =========================================
-   AUDIO
-========================================= */
-
-let audioCtx = null;
-let masterGain = null;
-let audioReady = false;
-
-function initAudio() {
-
-  if (audioCtx) return audioCtx;
-
-  try {
+  function initAudio() {
+    if (audioCtx) return audioCtx;
 
     const AudioContext =
       window.AudioContext ||
@@ -60,663 +49,731 @@ function initAudio() {
 
     if (!AudioContext) return null;
 
-    audioCtx = new AudioContext();
-
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.17;
-
-    masterGain.connect(audioCtx.destination);
-
-    audioReady = true;
-
-    if (audioCtx.state === "suspended") {
-      audioCtx.resume().catch(() => {});
+    try {
+      audioCtx = new AudioContext();
+    } catch {
+      audioCtx = null;
     }
 
     return audioCtx;
-
-  } catch (error) {
-
-    return null;
-
   }
 
-}
+  async function unlockAudio() {
+    const ctx = initAudio();
 
+    if (!ctx) return false;
 
-async function unlockAudio() {
+    try {
+      if (ctx.state !== "running") {
+        await ctx.resume();
+      }
 
-  const ctx = initAudio();
-
-  if (!ctx) return;
-
-  try {
-
-    if (ctx.state !== "running") {
-      await ctx.resume();
+      audioUnlocked = ctx.state === "running";
+    } catch {
+      audioUnlocked = false;
     }
 
-    audioReady = ctx.state === "running";
+    return audioUnlocked;
+  }
 
-  } catch (error) {}
+  function audioTime() {
+    return audioCtx ? audioCtx.currentTime : 0;
+  }
 
-}
+  function tone({
+    frequency = 440,
+    duration = 0.08,
+    type = "sine",
+    volume = 0.035,
+    delay = 0,
+    attack = 0.008,
+    release = 0.06
+  } = {}) {
 
+    const ctx = initAudio();
 
-function soundTone(
-  frequency = 440,
-  duration = .08,
-  type = "sine",
-  volume = .04,
-  delay = 0
-) {
+    if (!ctx || ctx.state !== "running") return;
 
-  const ctx = initAudio();
-
-  if (!ctx || !masterGain) return;
-
-  try {
-
-    const start = ctx.currentTime + delay;
+    const now = audioTime() + delay;
 
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
 
     oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, start);
+    oscillator.frequency.setValueAtTime(frequency, now);
 
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(
-      Math.max(volume, 0.0002),
-      start + .008
-    );
-
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(volume, now + attack);
+    gain.gain.setValueAtTime(volume, now + Math.max(attack, duration - release));
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      start + duration
+      now + duration
     );
 
     oscillator.connect(gain);
-    gain.connect(masterGain);
+    gain.connect(ctx.destination);
 
-    oscillator.start(start);
-    oscillator.stop(start + duration + .02);
-
-  } catch (error) {}
-
-}
-
-
-function soundClick() {
-  soundTone(950, .045, "square", .028);
-}
-
-
-function soundScan() {
-
-  soundTone(620, .08, "sine", .025);
-  soundTone(920, .06, "sine", .018, .1);
-
-}
-
-
-function soundDetection() {
-
-  soundTone(180, .14, "sine", .045);
-  soundTone(360, .08, "square", .025, .16);
-  soundTone(720, .05, "sine", .018, .28);
-
-}
-
-
-function soundAccess() {
-
-  soundTone(520, .06, "sine", .035);
-  soundTone(780, .12, "sine", .035, .08);
-
-}
-
-
-function soundWarning() {
-
-  soundTone(150, .16, "sine", .045);
-  soundTone(110, .2, "sine", .03, .2);
-
-}
-
-
-function soundService() {
-
-  soundTone(260, .05, "square", .025);
-  soundTone(410, .06, "square", .022, .12);
-  soundTone(620, .07, "sine", .018, .24);
-
-}
-
-
-function soundNetwork() {
-
-  soundTone(310, .06, "sine", .02);
-  soundTone(390, .06, "sine", .022, .15);
-  soundTone(490, .06, "sine", .024, .3);
-  soundTone(700, .13, "sine", .04, .5);
-
-}
-
-
-function soundReady() {
-
-  soundTone(420, .08, "sine", .025);
-  soundTone(620, .1, "sine", .03, .12);
-  soundTone(880, .16, "sine", .035, .26);
-
-}
-
-
-/*
-  Browser autoplay policies can block audio before
-  a user gesture. We do not show an activation button.
-  Natural interaction unlocks audio automatically.
-*/
-
-window.addEventListener(
-  "pointerdown",
-  unlockAudio,
-  {
-    passive: true
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.02);
   }
-);
 
-window.addEventListener(
-  "touchstart",
-  unlockAudio,
-  {
-    passive: true
+  function soundClick() {
+    tone({
+      frequency: 950,
+      duration: 0.055,
+      type: "square",
+      volume: 0.028
+    });
   }
-);
 
-window.addEventListener(
-  "keydown",
-  unlockAudio
-);
+  function soundScan() {
+    tone({
+      frequency: 280,
+      duration: 0.15,
+      type: "sine",
+      volume: 0.024
+    });
 
-window.addEventListener(
-  "wheel",
-  unlockAudio,
-  {
-    passive: true
+    tone({
+      frequency: 620,
+      duration: 0.08,
+      type: "sine",
+      volume: 0.018,
+      delay: 0.07
+    });
   }
-);
 
+  function soundDetection() {
+    tone({
+      frequency: 150,
+      duration: 0.18,
+      type: "sine",
+      volume: 0.038
+    });
 
-/* =========================================
-   LOADER
-========================================= */
+    tone({
+      frequency: 540,
+      duration: 0.055,
+      type: "square",
+      volume: 0.022,
+      delay: 0.17
+    });
 
-const loaderSteps = [
-  "ПРОВЕРКА ВИДЕОНАБЛЮДЕНИЯ",
-  "ПРОВЕРКА ПОЖАРНОЙ БЕЗОПАСНОСТИ",
-  "ПРОВЕРКА СКУД",
-  "ПРОВЕРКА СОСТОЯНИЯ ОБЪЕКТА",
-  "СИНХРОНИЗАЦИЯ ЦЕНТРА КОНТРОЛЯ"
-];
+    tone({
+      frequency: 720,
+      duration: 0.055,
+      type: "square",
+      volume: 0.02,
+      delay: 0.25
+    });
+  }
 
-function runLoader() {
+  function soundAccess() {
+    tone({
+      frequency: 820,
+      duration: 0.07,
+      type: "sine",
+      volume: 0.028
+    });
 
-  let step = 0;
+    tone({
+      frequency: 1160,
+      duration: 0.11,
+      type: "sine",
+      volume: 0.028,
+      delay: 0.08
+    });
+  }
 
-  loaderStatus.textContent = "ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ";
+  function soundWarning() {
+    tone({
+      frequency: 125,
+      duration: 0.25,
+      type: "sine",
+      volume: 0.045
+    });
 
-  const timer = setInterval(() => {
+    tone({
+      frequency: 180,
+      duration: 0.16,
+      type: "sine",
+      volume: 0.03,
+      delay: 0.16
+    });
+  }
 
-    if (step >= loaderSteps.length) {
+  function soundService() {
+    tone({
+      frequency: 210,
+      duration: 0.07,
+      type: "square",
+      volume: 0.025
+    });
 
-      clearInterval(timer);
+    tone({
+      frequency: 320,
+      duration: 0.07,
+      type: "square",
+      volume: 0.022,
+      delay: 0.11
+    });
+  }
 
-      loaderProgress.style.width = "100%";
-      loaderStatus.textContent = "СИСТЕМА СИНХРОНИЗИРОВАНА";
+  function soundNetwork() {
+    tone({
+      frequency: 430,
+      duration: 0.07,
+      type: "sine",
+      volume: 0.022
+    });
 
-      loaderReady.classList.add("show");
+    tone({
+      frequency: 570,
+      duration: 0.09,
+      type: "sine",
+      volume: 0.024,
+      delay: 0.12
+    });
 
-      soundReady();
+    tone({
+      frequency: 760,
+      duration: 0.12,
+      type: "sine",
+      volume: 0.026,
+      delay: 0.25
+    });
+  }
 
-      setTimeout(() => {
+  function soundReady() {
+    tone({
+      frequency: 520,
+      duration: 0.08,
+      type: "sine",
+      volume: 0.022
+    });
 
-        loader.classList.add("hidden");
+    tone({
+      frequency: 780,
+      duration: 0.12,
+      type: "sine",
+      volume: 0.028,
+      delay: 0.1
+    });
 
-        setTimeout(() => {
-          activateScene(0);
-        }, 500);
+    tone({
+      frequency: 1040,
+      duration: 0.18,
+      type: "sine",
+      volume: 0.025,
+      delay: 0.22
+    });
+  }
 
-      }, 900);
+  function playSceneSound(index) {
 
-      return;
-    }
+    if (lastSceneSound === index) return;
 
-    const item = checks[step];
+    lastSceneSound = index;
 
-    item.classList.add("active");
-
-    item.querySelector("b").textContent = "CHECK";
-
-    loaderStatus.textContent = loaderSteps[step];
-
-    loaderProgress.style.width =
-      `${((step + 1) / loaderSteps.length) * 100}%`;
-
-    soundClick();
+    unlockAudio();
 
     setTimeout(() => {
 
-      item.classList.remove("active");
-      item.classList.add("done");
+      if (!audioUnlocked) return;
 
-      item.querySelector("b").textContent = "OK";
+      switch (index) {
+        case 0:
+          soundClick();
+          break;
 
-    }, 360);
+        case 1:
+          soundScan();
+          break;
 
-    step++;
+        case 2:
+          soundDetection();
+          break;
 
-  }, 620);
+        case 3:
+          soundAccess();
+          break;
 
-}
+        case 4:
+          soundWarning();
+          break;
 
-initAudio();
+        case 5:
+          soundService();
+          break;
 
-setTimeout(runLoader, 500);
+        case 6:
+          soundNetwork();
+          break;
 
+        case 7:
+          soundReady();
+          break;
+      }
 
-/* =========================================
-   CLOCK
-========================================= */
-
-function updateClock() {
-
-  const now = new Date();
-
-  const h = String(now.getHours()).padStart(2, "0");
-  const m = String(now.getMinutes()).padStart(2, "0");
-  const s = String(now.getSeconds()).padStart(2, "0");
-
-  clock.textContent = `${h}:${m}:${s}`;
-
-}
-
-updateClock();
-setInterval(updateClock, 1000);
+    }, 90);
+  }
 
 
-/* =========================================
-   SCENE
-========================================= */
+  /*
+   * Browser autoplay policy:
+   * sound is prepared automatically, but if the browser
+   * suspends AudioContext, the first natural tap/click/key
+   * unlocks it. No visible activation button is needed.
+   */
 
-function activateScene(index) {
+  initAudio();
 
-  scenes.forEach((scene, i) => {
-    scene.classList.toggle("active", i === index);
+  window.addEventListener("pointerdown", unlockAudio, {
+    passive: true
   });
 
-  currentScene = index;
+  window.addEventListener("touchstart", unlockAudio, {
+    passive: true
+  });
 
-  currentSceneEl.textContent =
-    String(index + 1).padStart(2, "0");
+  window.addEventListener("keydown", unlockAudio);
 
-  progressBar.style.width =
-    `${((index + 1) / scenes.length) * 100}%`;
-
-  track.style.transform =
-    `translate3d(-${index * 100}vw, 0, 0)`;
-
-  playSceneSound(index);
-
-}
-
-
-function playSceneSound(index) {
-
-  unlockAudio();
-
-  setTimeout(() => {
-
-    switch (index) {
-
-      case 0:
-        soundClick();
-        break;
-
-      case 1:
-        soundScan();
-        break;
-
-      case 2:
-        soundDetection();
-        break;
-
-      case 3:
-        soundAccess();
-        break;
-
-      case 4:
-        soundWarning();
-        break;
-
-      case 5:
-        soundService();
-        break;
-
-      case 6:
-        soundNetwork();
-        break;
-
-      case 7:
-        soundReady();
-        break;
-
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      unlockAudio();
     }
-
-  }, 180);
-
-}
+  });
 
 
-function goToScene(index) {
+  /* =========================================
+     CLOCK
+  ========================================= */
 
-  if (index < 0) index = 0;
-  if (index > scenes.length - 1) {
-    index = scenes.length - 1;
+  function updateClock() {
+
+    if (!clock) return;
+
+    const now = new Date();
+
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+
+    clock.textContent =
+      `${hours}:${minutes}:${seconds}`;
   }
 
-  if (index === currentScene) return;
-
-  activateScene(index);
-
-}
+  updateClock();
+  setInterval(updateClock, 1000);
 
 
-/* =========================================
-   WHEEL
-========================================= */
+  /* =========================================
+     SCENE POSITION
+  ========================================= */
 
-experience.addEventListener(
-  "wheel",
-  event => {
+  function updateUI(index) {
 
-    event.preventDefault();
+    progressCurrent.textContent =
+      String(index + 1).padStart(2, "0");
 
-    const now = performance.now();
+    progressFill.style.width =
+      `${((index + 1) / scenes.length) * 100}%`;
 
-    if (now - lastWheelTime < 450) return;
-
-    wheelAccumulator +=
-      Math.abs(event.deltaY) > Math.abs(event.deltaX)
-        ? event.deltaY
-        : event.deltaX;
-
-    if (Math.abs(wheelAccumulator) < 35) {
-      return;
-    }
-
-    const direction =
-      wheelAccumulator > 0 ? 1 : -1;
-
-    wheelAccumulator = 0;
-    lastWheelTime = now;
-
-    goToScene(currentScene + direction);
-
-  },
-  {
-    passive: false
+    menuItems.forEach((item, i) => {
+      item.classList.toggle("active", i === index);
+    });
   }
-);
 
 
-/* =========================================
-   POINTER DRAG
-========================================= */
+  function setSceneActive(index) {
 
-experience.addEventListener(
-  "pointerdown",
-  event => {
+    scenes.forEach((scene, i) => {
+      scene.classList.toggle(
+        "is-active",
+        i === index
+      );
+    });
 
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    isDragging = true;
-    dragMoved = false;
-
-    dragStartX = event.clientX;
-    dragCurrentX = event.clientX;
-
-    experience.classList.add("dragging");
-
-    try {
-      experience.setPointerCapture(event.pointerId);
-    } catch (error) {}
-
+    updateUI(index);
   }
-);
 
 
-experience.addEventListener(
-  "pointermove",
-  event => {
+  function goToScene(index, force = false) {
 
-    if (!isDragging) return;
-
-    dragCurrentX = event.clientX;
-
-    if (Math.abs(dragCurrentX - dragStartX) > 8) {
-      dragMoved = true;
+    if (index < 0) index = 0;
+    if (index > scenes.length - 1) {
+      index = scenes.length - 1;
     }
 
+    if (!force && index === currentScene) return;
+    if (isMoving && !force) return;
+
+    currentScene = index;
+    isMoving = true;
+
+    experience.style.transform =
+      `translate3d(${-index * 100}vw, 0, 0)`;
+
+    setSceneActive(index);
+    playSceneSound(index);
+
+    setTimeout(() => {
+      isMoving = false;
+    }, 850);
   }
-);
 
 
-experience.addEventListener(
-  "pointerup",
-  event => {
+  /* =========================================
+     MENU
+  ========================================= */
 
-    if (!isDragging) return;
-
-    const distance =
-      dragCurrentX - dragStartX;
-
-    isDragging = false;
-
-    experience.classList.remove("dragging");
-
-    try {
-      experience.releasePointerCapture(event.pointerId);
-    } catch (error) {}
-
-    if (Math.abs(distance) < 55) {
-      return;
-    }
-
-    if (distance < 0) {
-      goToScene(currentScene + 1);
-    } else {
-      goToScene(currentScene - 1);
-    }
-
+  function openMenu() {
+    menu.classList.add("open");
   }
-);
 
-
-experience.addEventListener(
-  "pointercancel",
-  () => {
-
-    isDragging = false;
-    experience.classList.remove("dragging");
-
+  function closeMenu() {
+    menu.classList.remove("open");
   }
-);
 
-
-/* =========================================
-   KEYBOARD
-========================================= */
-
-window.addEventListener(
-  "keydown",
-  event => {
-
-    if (
-      event.key === "ArrowRight" ||
-      event.key === "PageDown"
-    ) {
-
-      event.preventDefault();
-      goToScene(currentScene + 1);
-
-    }
-
-    if (
-      event.key === "ArrowLeft" ||
-      event.key === "PageUp"
-    ) {
-
-      event.preventDefault();
-      goToScene(currentScene - 1);
-
-    }
-
-    if (event.key === "Home") {
-
-      event.preventDefault();
-      goToScene(0);
-
-    }
-
-    if (event.key === "End") {
-
-      event.preventDefault();
-      goToScene(scenes.length - 1);
-
-    }
-
-    if (event.key === "Escape") {
-
-      closeMenu();
-
-    }
-
-  }
-);
-
-
-/* =========================================
-   MENU
-========================================= */
-
-function openMenu() {
-
-  menu.classList.add("open");
-
-}
-
-
-function closeMenu() {
-
-  menu.classList.remove("open");
-
-}
-
-
-menuButton.addEventListener(
-  "click",
-  event => {
-
-    event.stopPropagation();
-
+  menuButton.addEventListener("click", () => {
     openMenu();
+    unlockAudio();
+  });
 
-  }
-);
+  menuClose.addEventListener("click", closeMenu);
 
+  menuItems.forEach(item => {
 
-menuClose.addEventListener(
-  "click",
-  closeMenu
-);
-
-
-menuItems.forEach(item => {
-
-  item.addEventListener(
-    "click",
-    () => {
+    item.addEventListener("click", () => {
 
       const index =
         Number(item.dataset.scene);
 
       closeMenu();
+      goToScene(index, true);
+    });
+
+  });
+
+
+  /* =========================================
+     WHEEL / TRACKPAD
+  ========================================= */
+
+  window.addEventListener(
+    "wheel",
+    (event) => {
+
+      if (menu.classList.contains("open")) return;
+
+      event.preventDefault();
+
+      if (wheelLocked) return;
+
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+
+      wheelAccumulator += delta;
+
+      if (Math.abs(wheelAccumulator) < 35) {
+        return;
+      }
+
+      const direction =
+        wheelAccumulator > 0 ? 1 : -1;
+
+      wheelAccumulator = 0;
+      wheelLocked = true;
+
+      goToScene(currentScene + direction);
 
       setTimeout(() => {
-        goToScene(index);
-      }, 150);
+        wheelLocked = false;
+      }, 720);
+
+    },
+    {
+      passive: false
+    }
+  );
+
+
+  /* =========================================
+     POINTER DRAG
+  ========================================= */
+
+  experience.addEventListener(
+    "pointerdown",
+    (event) => {
+
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+
+      unlockAudio();
+
+      pointerDown = true;
+      pointerMoved = false;
+
+      pointerStartX = event.clientX;
+      pointerLastX = event.clientX;
+
+      experience.setPointerCapture?.(event.pointerId);
+
+      experience.style.transition = "none";
+    }
+  );
+
+
+  experience.addEventListener(
+    "pointermove",
+    (event) => {
+
+      if (!pointerDown) return;
+
+      const delta =
+        event.clientX - pointerStartX;
+
+      const moveDelta =
+        event.clientX - pointerLastX;
+
+      pointerLastX = event.clientX;
+
+      if (Math.abs(delta) > 8) {
+        pointerMoved = true;
+      }
+
+      if (!pointerMoved) return;
+
+      const base =
+        -currentScene * window.innerWidth;
+
+      const limited =
+        Math.max(
+          -((scenes.length - 1) * window.innerWidth),
+          Math.min(0, base + delta)
+        );
+
+      experience.style.transform =
+        `translate3d(${limited}px, 0, 0)`;
+
+      if (Math.abs(moveDelta) > 1) {
+        event.preventDefault();
+      }
 
     }
   );
 
-});
+
+  experience.addEventListener(
+    "pointerup",
+    (event) => {
+
+      if (!pointerDown) return;
+
+      pointerDown = false;
+
+      experience.releasePointerCapture?.(event.pointerId);
+
+      experience.style.transition =
+        "transform .8s cubic-bezier(.22,.61,.36,1)";
+
+      const delta =
+        event.clientX - pointerStartX;
+
+      if (Math.abs(delta) > 55) {
+
+        if (delta < 0) {
+          goToScene(currentScene + 1);
+        } else {
+          goToScene(currentScene - 1);
+        }
+
+      } else {
+
+        goToScene(currentScene, true);
+      }
+
+    }
+  );
 
 
-/* =========================================
-   CLOSE MENU OUTSIDE
-========================================= */
+  experience.addEventListener(
+    "pointercancel",
+    () => {
 
-document.addEventListener(
-  "pointerdown",
-  event => {
+      pointerDown = false;
 
-    if (!menu.classList.contains("open")) {
+      experience.style.transition =
+        "transform .8s cubic-bezier(.22,.61,.36,1)";
+
+      goToScene(currentScene, true);
+    }
+  );
+
+
+  /* =========================================
+     KEYBOARD
+  ========================================= */
+
+  window.addEventListener("keydown", (event) => {
+
+    if (menu.classList.contains("open")) {
+
+      if (event.key === "Escape") {
+        closeMenu();
+      }
+
       return;
     }
 
     if (
-      !menu.contains(event.target) &&
-      !menuButton.contains(event.target)
+      event.key === "ArrowRight" ||
+      event.key === "ArrowDown"
     ) {
-
-      closeMenu();
-
+      event.preventDefault();
+      goToScene(currentScene + 1);
     }
 
+    if (
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowUp"
+    ) {
+      event.preventDefault();
+      goToScene(currentScene - 1);
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      goToScene(0);
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      goToScene(scenes.length - 1);
+    }
+  });
+
+
+  /* =========================================
+     RESIZE
+  ========================================= */
+
+  let resizeTimer;
+
+  window.addEventListener("resize", () => {
+
+    clearTimeout(resizeTimer);
+
+    resizeTimer = setTimeout(() => {
+
+      experience.style.transition = "none";
+
+      experience.style.transform =
+        `translate3d(${-currentScene * 100}vw, 0, 0)`;
+
+      requestAnimationFrame(() => {
+
+        experience.style.transition =
+          "transform .8s cubic-bezier(.22,.61,.36,1)";
+
+      });
+
+    }, 100);
+  });
+
+
+  /* =========================================
+     LOADER
+  ========================================= */
+
+  const loaderTexts = [
+    "ПРОВЕРКА ВИДЕОНАБЛЮДЕНИЯ",
+    "ПРОВЕРКА ПОЖАРНОЙ БЕЗОПАСНОСТИ",
+    "ПРОВЕРКА СКУД",
+    "ПРОВЕРКА СОСТОЯНИЯ ОБЪЕКТА",
+    "СИНХРОНИЗАЦИЯ ЦЕНТРА КОНТРОЛЯ"
+  ];
+
+
+  function activateLoaderCheck(index) {
+
+    const check = loaderChecks[index];
+
+    if (!check) return;
+
+    check.classList.add("active");
+
+    const status = check.querySelector("b");
+
+    if (status) {
+      status.textContent = "OK";
+    }
+
+    if (index % 2 === 0) {
+      soundClick();
+    } else {
+      soundService();
+    }
+
+    loaderProgressBar.style.width =
+      `${((index + 1) / loaderChecks.length) * 100}%`;
   }
-);
 
 
-/* =========================================
-   INITIAL STATE
-========================================= */
+  function runLoader() {
 
-track.style.transform =
-  "translate3d(0,0,0)";
+    let index = 0;
 
-scenes[0].classList.add("active");
+    loaderStatus.textContent =
+      "ПРОВЕРКА СИСТЕМЫ";
 
+    const interval = setInterval(() => {
 
-/* =========================================
-   RESIZE
-========================================= */
+      if (index >= loaderChecks.length) {
 
-window.addEventListener(
-  "resize",
-  () => {
+        clearInterval(interval);
 
-    track.style.transition = "none";
+        loaderStatus.textContent =
+          "СИСТЕМА ГОТОВА";
 
-    track.style.transform =
-      `translate3d(-${currentScene * 100}vw,0,0)`;
+        loaderReady.classList.add("visible");
 
-    requestAnimationFrame(() => {
-      track.style.transition = "";
-    });
+        soundReady();
 
+        setTimeout(() => {
+
+          loader.classList.add("hidden");
+
+          setSceneActive(0);
+          playSceneSound(0);
+
+        }, 900);
+
+        return;
+      }
+
+      loaderStatus.textContent =
+        loaderTexts[index];
+
+      activateLoaderCheck(index);
+
+      index++;
+
+    }, 650);
   }
-);
+
+
+  /* =========================================
+     START
+  ========================================= */
+
+  setSceneActive(0);
+
+  setTimeout(() => {
+    runLoader();
+  }, 500);
+
+})();
