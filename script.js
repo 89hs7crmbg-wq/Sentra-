@@ -2,57 +2,91 @@
   "use strict";
 
   /* =========================================================
-     SENTRA — EXPERIENCE CONTROLLER + ADAPTIVE SOUND
-     ========================================================= */
+     DOM
+  ========================================================== */
 
-  const track = document.querySelector(".track");
-  const scenes = [...document.querySelectorAll(".scene")];
+  const loader = document.getElementById("loader");
+  const loaderStart = document.getElementById("loaderStart");
+  const loaderProgress = document.getElementById("loaderProgress");
+  const loaderPercent = document.getElementById("loaderPercent");
+  const loaderState = document.getElementById("loaderState");
+  const loaderReady = document.getElementById("loaderReady");
 
-  const progressCurrent = document.querySelector(".progress-current");
-  const progressTotal = document.querySelector(".progress-total");
-  const progressBar = document.querySelector(".progress-line span");
+  const track = document.getElementById("track");
+  const experience = document.getElementById("experience");
 
-  const dateElement = document.querySelector("[data-date]");
-  const timeElement = document.querySelector("[data-time]");
+  const sceneCurrent = document.getElementById("sceneCurrent");
+  const sceneProgress = document.getElementById("sceneProgress");
+  const sceneHint = document.getElementById("sceneHint");
 
-  const loader = document.querySelector(".loader");
-  const loaderProgress = document.querySelector(".loader-progress span");
-  const loaderStatus = document.querySelector(".loader-status");
-  const loaderChecks = [...document.querySelectorAll(".loader-check")];
+  const headerTime = document.getElementById("headerTime");
 
-  const menuButton = document.querySelector(".menu-toggle");
-  const menu = document.querySelector(".mobile-menu");
+  const menuButton = document.getElementById("menuButton");
+  const mobileMenu = document.getElementById("mobileMenu");
 
-  let sceneIndex = 0;
-  let sceneCount = scenes.length;
+  const soundControl = document.getElementById("soundControl");
+  const soundLabel = document.getElementById("soundLabel");
+
+
+  /* =========================================================
+     STATE
+  ========================================================== */
+
+  const SCENE_COUNT = 8;
+
+  let currentScene = 0;
+  let targetScene = 0;
 
   let isAnimating = false;
-  let isDragging = false;
-  let dragStartX = 0;
-  let dragCurrentX = 0;
-  let dragStartScene = 0;
+  let animationFrame = null;
 
-  let wheelLock = false;
+  let pointerDown = false;
+  let pointerStartX = 0;
+  let pointerCurrentX = 0;
+  let pointerStartScene = 0;
+
+  let wheelLocked = false;
+  let wheelTimer = null;
+
   let touchStartX = 0;
   let touchStartY = 0;
 
   let loaderFinished = false;
-  let loaderTimer = null;
+  let loaderStarted = false;
+
+  let soundEnabled = true;
+  let audioUnlocked = false;
+  let audioContext = null;
+
+  let scannerSoundTimer = null;
+  let networkSoundTimer = null;
+
+  const sceneSoundPlayed = new Set();
+
+
+  /* =========================================================
+     CLOCK
+  ========================================================== */
+
+  function updateClock() {
+    const now = new Date();
+
+    const h = String(now.getHours()).padStart(2, "0");
+    const m = String(now.getMinutes()).padStart(2, "0");
+    const s = String(now.getSeconds()).padStart(2, "0");
+
+    if (headerTime) {
+      headerTime.textContent = `${h}:${m}:${s}`;
+    }
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+
 
   /* =========================================================
      AUDIO
-     ========================================================= */
-
-  let audioContext = null;
-  let soundEnabled = true;
-  let audioUnlocked = false;
-  let soundControl = null;
-
-  let scannerOscillator = null;
-  let scannerGain = null;
-  let scannerRunning = false;
-
-  let lastNetworkSound = 0;
+  ========================================================== */
 
   function getAudioContext() {
     if (!audioContext) {
@@ -68,88 +102,144 @@
     return audioContext;
   }
 
-  function unlockAudio() {
+
+  async function unlockAudio() {
     if (!soundEnabled) return;
 
     const ctx = getAudioContext();
 
     if (!ctx) return;
 
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
+    try {
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
 
-    audioUnlocked = true;
+      audioUnlocked = ctx.state === "running";
+
+      if (audioUnlocked && !loaderStarted && !loaderFinished) {
+        startLoader();
+      }
+    } catch (error) {
+      audioUnlocked = false;
+    }
   }
+
 
   function nowTime() {
-    const ctx = getAudioContext();
-    return ctx ? ctx.currentTime : 0;
+    return getAudioContext()?.currentTime || 0;
   }
 
-  function createGain(value = 0.08) {
+
+  function makeGain(value, duration = 0.2) {
     const ctx = getAudioContext();
-    if (!ctx) return null;
+
+    if (!ctx || !audioUnlocked || !soundEnabled) return null;
 
     const gain = ctx.createGain();
-    gain.gain.value = value;
+    gain.gain.setValueAtTime(0.0001, nowTime());
+    gain.gain.exponentialRampToValueAtTime(
+      Math.max(value, 0.0002),
+      nowTime() + duration
+    );
+
     gain.connect(ctx.destination);
 
     return gain;
   }
 
+
   function tone({
     frequency = 440,
-    duration = 0.08,
+    duration = 0.12,
+    volume = 0.035,
     type = "sine",
-    volume = 0.04,
-    attack = 0.005,
-    release = 0.08,
-    detune = 0
+    endFrequency = null
   } = {}) {
-    if (!soundEnabled || !audioUnlocked) return;
 
     const ctx = getAudioContext();
-    if (!ctx) return;
 
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
+    if (!ctx || !audioUnlocked || !soundEnabled) return;
 
     const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const gain = makeGain(volume, 0.015);
+
+    if (!gain) return;
 
     oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
-    oscillator.detune.setValueAtTime(detune, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(frequency, nowTime());
 
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    if (endFrequency) {
+      oscillator.frequency.exponentialRampToValueAtTime(
+        Math.max(endFrequency, 20),
+        nowTime() + duration
+      );
+    }
+
+    oscillator.connect(gain);
+
+    const end = nowTime() + duration;
+
     gain.gain.exponentialRampToValueAtTime(
-      Math.max(volume, 0.0002),
-      ctx.currentTime + attack
+      0.0001,
+      end
+    );
+
+    oscillator.start(nowTime());
+    oscillator.stop(end + 0.03);
+  }
+
+
+  function filteredTone({
+    frequency = 300,
+    duration = 0.15,
+    volume = 0.03
+  } = {}) {
+
+    const ctx = getAudioContext();
+
+    if (!ctx || !audioUnlocked || !soundEnabled) return;
+
+    const osc = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(frequency, nowTime());
+
+    filter.type = "lowpass";
+    filter.frequency.value = 900;
+    filter.Q.value = 0.7;
+
+    gain.gain.setValueAtTime(0.0001, nowTime());
+    gain.gain.exponentialRampToValueAtTime(
+      volume,
+      nowTime() + 0.02
     );
 
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      ctx.currentTime + duration + release
+      nowTime() + duration
     );
 
-    oscillator.connect(gain);
+    osc.connect(filter);
+    filter.connect(gain);
     gain.connect(ctx.destination);
 
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + duration + release + 0.02);
+    osc.start();
+    osc.stop(nowTime() + duration + 0.03);
   }
 
+
   function noiseBurst({
-    duration = 0.12,
+    duration = 0.15,
     volume = 0.025,
-    filterFrequency = 1800
+    frequency = 1200
   } = {}) {
-    if (!soundEnabled || !audioUnlocked) return;
 
     const ctx = getAudioContext();
-    if (!ctx) return;
+
+    if (!ctx || !audioUnlocked || !soundEnabled) return;
 
     const bufferSize = Math.floor(ctx.sampleRate * duration);
     const buffer = ctx.createBuffer(
@@ -168,414 +258,333 @@
     const filter = ctx.createBiquadFilter();
     const gain = ctx.createGain();
 
-    filter.type = "bandpass";
-    filter.frequency.value = filterFrequency;
-    filter.Q.value = 1.4;
+    source.buffer = buffer;
 
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    filter.type = "bandpass";
+    filter.frequency.value = frequency;
+    filter.Q.value = 1.2;
+
+    gain.gain.setValueAtTime(0.0001, nowTime());
     gain.gain.exponentialRampToValueAtTime(
       volume,
-      ctx.currentTime + 0.008
+      nowTime() + 0.015
     );
-
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      ctx.currentTime + duration
+      nowTime() + duration
     );
-
-    source.buffer = buffer;
 
     source.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
 
     source.start();
-    source.stop(ctx.currentTime + duration + 0.02);
   }
 
-  function clickSound() {
-    tone({
-      frequency: 1250,
-      duration: 0.035,
-      type: "square",
-      volume: 0.025,
-      attack: 0.001,
-      release: 0.025
+
+  function mechanicalClick() {
+    filteredTone({
+      frequency: 170,
+      duration: 0.055,
+      volume: 0.04
     });
 
-    tone({
-      frequency: 720,
-      duration: 0.025,
-      type: "sine",
-      volume: 0.012,
-      attack: 0.001,
-      release: 0.02,
-      detune: -20
-    });
+    setTimeout(() => {
+      filteredTone({
+        frequency: 280,
+        duration: 0.035,
+        volume: 0.025
+      });
+    }, 45);
   }
+
 
   function soundBoot() {
-    if (!soundEnabled || !audioUnlocked) return;
+    if (!audioUnlocked || !soundEnabled) return;
 
-    tone({
-      frequency: 110,
-      duration: 0.16,
-      type: "sine",
-      volume: 0.035,
-      attack: 0.015,
-      release: 0.12
-    });
-
-    setTimeout(() => {
-      tone({
-        frequency: 220,
-        duration: 0.18,
-        type: "sine",
-        volume: 0.025,
-        attack: 0.01,
-        release: 0.14
-      });
-    }, 90);
-
-    setTimeout(() => {
-      clickSound();
-    }, 210);
-  }
-
-  function soundSystemCheck() {
-    if (!soundEnabled || !audioUnlocked) return;
-
-    clickSound();
-
-    setTimeout(() => {
-      tone({
-        frequency: 660,
-        duration: 0.055,
-        type: "sine",
-        volume: 0.018,
-        attack: 0.003,
-        release: 0.04
-      });
-    }, 100);
-  }
-
-  function soundSystemReady() {
-    if (!soundEnabled || !audioUnlocked) return;
-
-    tone({
-      frequency: 392,
-      duration: 0.08,
-      type: "sine",
+    filteredTone({
+      frequency: 90,
+      duration: 0.35,
       volume: 0.025
     });
 
     setTimeout(() => {
       tone({
-        frequency: 587.33,
-        duration: 0.12,
+        frequency: 180,
+        duration: 0.16,
+        volume: 0.018,
         type: "sine",
-        volume: 0.035
+        endFrequency: 230
       });
-    }, 100);
+    }, 180);
+  }
+
+
+  function soundCheck(index) {
+    if (!audioUnlocked || !soundEnabled) return;
+
+    const frequencies = [
+      330,
+      280,
+      390,
+      300,
+      440
+    ];
+
+    mechanicalClick();
 
     setTimeout(() => {
       tone({
-        frequency: 783.99,
-        duration: 0.16,
-        type: "sine",
-        volume: 0.045
+        frequency: frequencies[index] || 330,
+        duration: 0.09,
+        volume: 0.018,
+        type: "sine"
       });
-    }, 210);
+    }, 90);
   }
 
-  function soundTransition() {
-    if (!soundEnabled || !audioUnlocked) return;
 
-    noiseBurst({
-      duration: 0.09,
-      volume: 0.018,
-      filterFrequency: 1500
-    });
+  function soundReady() {
+    if (!audioUnlocked || !soundEnabled) return;
 
     tone({
-      frequency: 180,
-      duration: 0.08,
+      frequency: 260,
+      duration: 0.18,
+      volume: 0.025,
       type: "sine",
-      volume: 0.012
+      endFrequency: 330
     });
-
-    setTimeout(() => {
-      clickSound();
-    }, 80);
-  }
-
-  function startScannerSound() {
-    if (!soundEnabled || !audioUnlocked || scannerRunning) return;
-
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    scannerOscillator = ctx.createOscillator();
-    scannerGain = ctx.createGain();
-
-    scannerOscillator.type = "sine";
-
-    scannerOscillator.frequency.setValueAtTime(
-      170,
-      ctx.currentTime
-    );
-
-    scannerOscillator.frequency.linearRampToValueAtTime(
-      820,
-      ctx.currentTime + 1.5
-    );
-
-    scannerOscillator.frequency.linearRampToValueAtTime(
-      210,
-      ctx.currentTime + 3.0
-    );
-
-    scannerGain.gain.setValueAtTime(0.0001, ctx.currentTime);
-
-    scannerGain.gain.linearRampToValueAtTime(
-      0.022,
-      ctx.currentTime + 0.18
-    );
-
-    scannerGain.gain.linearRampToValueAtTime(
-      0.0001,
-      ctx.currentTime + 3.0
-    );
-
-    scannerOscillator.connect(scannerGain);
-    scannerGain.connect(ctx.destination);
-
-    scannerOscillator.start();
-
-    scannerRunning = true;
-
-    setTimeout(() => {
-      if (scannerOscillator) {
-        try {
-          scannerOscillator.stop();
-        } catch (_) {}
-      }
-
-      scannerOscillator = null;
-      scannerGain = null;
-      scannerRunning = false;
-    }, 3050);
-
-    setTimeout(() => {
-      if (soundEnabled && audioUnlocked) {
-        tone({
-          frequency: 1180,
-          duration: 0.045,
-          type: "sine",
-          volume: 0.025
-        });
-      }
-    }, 1500);
-  }
-
-  function stopScannerSound() {
-    if (!scannerOscillator) return;
-
-    try {
-      scannerOscillator.stop();
-    } catch (_) {}
-
-    scannerOscillator = null;
-    scannerGain = null;
-    scannerRunning = false;
-  }
-
-  function soundDetection() {
-    if (!soundEnabled || !audioUnlocked) return;
-
-    tone({
-      frequency: 92,
-      duration: 0.17,
-      type: "sine",
-      volume: 0.035,
-      attack: 0.008,
-      release: 0.16
-    });
-
-    setTimeout(() => {
-      clickSound();
-    }, 170);
 
     setTimeout(() => {
       tone({
         frequency: 520,
-        duration: 0.055,
-        type: "square",
-        volume: 0.022
+        duration: 0.25,
+        volume: 0.018,
+        type: "sine"
       });
-    }, 270);
+    }, 120);
   }
 
-  function soundAccessGranted() {
-    if (!soundEnabled || !audioUnlocked) return;
+
+  function soundTransition() {
+    if (!audioUnlocked || !soundEnabled) return;
+
+    noiseBurst({
+      duration: 0.12,
+      volume: 0.012,
+      frequency: 850
+    });
 
     tone({
-      frequency: 740,
-      duration: 0.07,
+      frequency: 110,
+      duration: 0.11,
+      volume: 0.018,
       type: "sine",
-      volume: 0.025
+      endFrequency: 70
+    });
+  }
+
+
+  function startScannerSound() {
+    stopScannerSound();
+
+    if (!audioUnlocked || !soundEnabled) return;
+
+    const ctx = getAudioContext();
+
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = "sine";
+
+    osc.frequency.setValueAtTime(150, nowTime());
+    osc.frequency.exponentialRampToValueAtTime(
+      720,
+      nowTime() + 1.8
+    );
+    osc.frequency.exponentialRampToValueAtTime(
+      190,
+      nowTime() + 3.2
+    );
+
+    gain.gain.setValueAtTime(0.0001, nowTime());
+    gain.gain.exponentialRampToValueAtTime(
+      0.018,
+      nowTime() + 0.25
+    );
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      nowTime() + 3.3
+    );
+
+    filter.type = "lowpass";
+    filter.frequency.value = 1100;
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(nowTime() + 3.4);
+
+    scannerSoundTimer = setTimeout(() => {
+      tone({
+        frequency: 690,
+        duration: 0.08,
+        volume: 0.022,
+        type: "sine"
+      });
+    }, 1650);
+  }
+
+
+  function stopScannerSound() {
+    if (scannerSoundTimer) {
+      clearTimeout(scannerSoundTimer);
+      scannerSoundTimer = null;
+    }
+  }
+
+
+  function soundDetection() {
+    if (!audioUnlocked || !soundEnabled) return;
+
+    tone({
+      frequency: 105,
+      duration: 0.2,
+      volume: 0.035,
+      type: "triangle",
+      endFrequency: 75
+    });
+
+    setTimeout(() => {
+      mechanicalClick();
+    }, 180);
+
+    setTimeout(() => {
+      tone({
+        frequency: 360,
+        duration: 0.1,
+        volume: 0.018,
+        type: "sine"
+      });
+    }, 300);
+  }
+
+
+  function soundAccess() {
+    if (!audioUnlocked || !soundEnabled) return;
+
+    tone({
+      frequency: 640,
+      duration: 0.08,
+      volume: 0.022,
+      type: "sine"
     });
 
     setTimeout(() => {
       tone({
-        frequency: 1046.5,
-        duration: 0.12,
-        type: "sine",
-        volume: 0.04
+        frequency: 920,
+        duration: 0.13,
+        volume: 0.025,
+        type: "sine"
       });
     }, 90);
   }
 
+
   function soundAlert() {
-    if (!soundEnabled || !audioUnlocked) return;
+    if (!audioUnlocked || !soundEnabled) return;
 
     tone({
-      frequency: 68,
-      duration: 0.28,
-      type: "sine",
+      frequency: 78,
+      duration: 0.4,
       volume: 0.045,
-      attack: 0.015,
-      release: 0.18
+      type: "triangle",
+      endFrequency: 62
     });
 
     setTimeout(() => {
-      tone({
-        frequency: 58,
-        duration: 0.22,
-        type: "sine",
-        volume: 0.035
-      });
-    }, 240);
-  }
-
-  function soundMaintenance() {
-    if (!soundEnabled || !audioUnlocked) return;
-
-    clickSound();
-
-    setTimeout(() => {
-      tone({
-        frequency: 330,
-        duration: 0.06,
-        type: "square",
-        volume: 0.018
-      });
-    }, 130);
-
-    setTimeout(() => {
-      clickSound();
-    }, 260);
-  }
-
-  function soundNetwork() {
-    if (!soundEnabled || !audioUnlocked) return;
-
-    const current = performance.now();
-
-    if (current - lastNetworkSound < 650) {
-      return;
-    }
-
-    lastNetworkSound = current;
-
-    tone({
-      frequency: 520,
-      duration: 0.045,
-      type: "sine",
-      volume: 0.012
-    });
-
-    setTimeout(() => {
-      tone({
-        frequency: 780,
-        duration: 0.045,
-        type: "sine",
-        volume: 0.014
-      });
-    }, 80);
-  }
-
-  function soundFinal() {
-    if (!soundEnabled || !audioUnlocked) return;
-
-    tone({
-      frequency: 392,
-      duration: 0.08,
-      type: "sine",
-      volume: 0.025
-    });
-
-    setTimeout(() => {
-      tone({
-        frequency: 659.25,
-        duration: 0.1,
-        type: "sine",
-        volume: 0.03
-      });
-    }, 110);
-
-    setTimeout(() => {
-      tone({
-        frequency: 783.99,
-        duration: 0.17,
-        type: "sine",
-        volume: 0.04
+      filteredTone({
+        frequency: 140,
+        duration: 0.12,
+        volume: 0.025
       });
     }, 220);
   }
 
-  function createSoundControl() {
-    if (soundControl) return;
 
-    soundControl = document.createElement("button");
-    soundControl.id = "sentraSoundControl";
-    soundControl.type = "button";
-    soundControl.textContent = "SOUND / ON";
+  function soundMaintenance() {
+    if (!audioUnlocked || !soundEnabled) return;
 
-    document.body.appendChild(soundControl);
+    mechanicalClick();
 
-    soundControl.addEventListener("click", (event) => {
-      event.stopPropagation();
+    setTimeout(() => {
+      filteredTone({
+        frequency: 210,
+        duration: 0.08,
+        volume: 0.022
+      });
+    }, 220);
+  }
 
-      if (!soundEnabled) {
-        soundEnabled = true;
-        unlockAudio();
 
-        soundControl.textContent = "SOUND / ON";
+  function soundNetwork() {
+    if (!audioUnlocked || !soundEnabled) return;
 
-        tone({
-          frequency: 620,
-          duration: 0.08,
-          type: "sine",
-          volume: 0.025
-        });
-      } else {
-        soundEnabled = false;
-        stopScannerSound();
+    const tones = [
+      260,
+      340,
+      410,
+      500
+    ];
 
-        soundControl.textContent = "SOUND / OFF";
-      }
+    const index = Math.floor(Date.now() / 700) % tones.length;
+
+    tone({
+      frequency: tones[index],
+      duration: 0.06,
+      volume: 0.012,
+      type: "sine"
     });
   }
 
+
+  function soundFinal() {
+    if (!audioUnlocked || !soundEnabled) return;
+
+    tone({
+      frequency: 220,
+      duration: 0.2,
+      volume: 0.02,
+      type: "sine",
+      endFrequency: 280
+    });
+
+    setTimeout(() => {
+      tone({
+        frequency: 440,
+        duration: 0.3,
+        volume: 0.015,
+        type: "sine"
+      });
+    }, 150);
+  }
+
+
   function playSceneSound(index) {
-    if (!soundEnabled || !audioUnlocked) return;
 
     stopScannerSound();
 
+    if (!soundEnabled || !audioUnlocked) return;
+
     switch (index) {
+
       case 0:
-        clickSound();
+        mechanicalClick();
         break;
 
       case 1:
@@ -587,7 +596,7 @@
         break;
 
       case 3:
-        soundAccessGranted();
+        soundAccess();
         break;
 
       case 4:
@@ -600,6 +609,17 @@
 
       case 6:
         soundNetwork();
+
+        if (networkSoundTimer) {
+          clearInterval(networkSoundTimer);
+        }
+
+        networkSoundTimer = setInterval(() => {
+          if (currentScene === 6) {
+            soundNetwork();
+          }
+        }, 1300);
+
         break;
 
       case 7:
@@ -608,745 +628,734 @@
     }
   }
 
+
   /* =========================================================
-     FIRST USER INTERACTION
-     ========================================================= */
+     SOUND CONTROL
+  ========================================================== */
 
-  function firstInteraction() {
-    if (!audioUnlocked) {
-      unlockAudio();
+  function updateSoundControl() {
 
-      if (!loaderFinished) {
-        soundBoot();
+    if (!soundControl || !soundLabel) return;
+
+    soundControl.classList.toggle(
+      "is-off",
+      !soundEnabled
+    );
+
+    soundLabel.textContent =
+      soundEnabled ? "ЗВУК / ON" : "ЗВУК / OFF";
+  }
+
+
+  soundControl?.addEventListener("click", async (event) => {
+
+    event.stopPropagation();
+
+    soundEnabled = !soundEnabled;
+
+    updateSoundControl();
+
+    if (soundEnabled) {
+      await unlockAudio();
+
+      if (audioUnlocked) {
+        mechanicalClick();
+        playSceneSound(currentScene);
+      }
+    } else {
+      stopScannerSound();
+
+      if (networkSoundTimer) {
+        clearInterval(networkSoundTimer);
+        networkSoundTimer = null;
       }
     }
-  }
+  });
 
-  window.addEventListener(
-    "pointerdown",
-    firstInteraction,
-    { passive: true, once: false }
-  );
 
-  window.addEventListener(
-    "touchstart",
-    firstInteraction,
-    { passive: true, once: false }
-  );
+  updateSoundControl();
 
-  window.addEventListener(
-    "keydown",
-    firstInteraction,
-    { passive: true, once: false }
-  );
-
-  /* =========================================================
-     CLOCK
-     ========================================================= */
-
-  function updateClock() {
-    const now = new Date();
-
-    if (dateElement) {
-      dateElement.textContent = new Intl.DateTimeFormat(
-        "ru-RU",
-        {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric"
-        }
-      ).format(now);
-    }
-
-    if (timeElement) {
-      timeElement.textContent = new Intl.DateTimeFormat(
-        "ru-RU",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit"
-        }
-      ).format(now);
-    }
-  }
-
-  updateClock();
-  setInterval(updateClock, 1000);
 
   /* =========================================================
      LOADER
-     ========================================================= */
+  ========================================================== */
 
-  function updateLoader(step) {
-    if (!loaderChecks.length) return;
+  const loaderTexts = [
+    "ПРОВЕРКА ВИДЕОНАБЛЮДЕНИЯ",
+    "ПРОВЕРКА ПОЖАРНОЙ БЕЗОПАСНОСТИ",
+    "ПРОВЕРКА СКУД",
+    "ПРОВЕРКА СОСТОЯНИЯ ОБЪЕКТА",
+    "СИНХРОНИЗАЦИЯ ЦЕНТРА КОНТРОЛЯ"
+  ];
 
-    loaderChecks.forEach((item, index) => {
-      item.classList.remove("active", "done");
 
-      const state = item.querySelector(".loader-check-state");
+  function setLoaderProgress(percent) {
 
-      if (index < step) {
-        item.classList.add("done");
+    const value = Math.max(0, Math.min(100, percent));
 
-        if (state) {
-          state.textContent = "OK";
-        }
-      } else if (index === step) {
-        item.classList.add("active");
-
-        if (state) {
-          state.textContent = "CHECK";
-        }
-      } else {
-        if (state) {
-          state.textContent = "WAIT";
-        }
-      }
-    });
+    loaderProgress.style.width = `${value}%`;
+    loaderPercent.textContent =
+      `${String(Math.round(value)).padStart(2, "0")}%`;
   }
 
+
+  function activateLoaderCheck(index) {
+
+    const checks = document.querySelectorAll(".loader-check");
+
+    checks.forEach((check, i) => {
+
+      check.classList.remove("active");
+
+      if (i < index) {
+        check.classList.add("done");
+      }
+
+      if (i === index) {
+        check.classList.add("active");
+      }
+    });
+
+    loaderState.textContent =
+      loaderTexts[index] || "СИНХРОНИЗАЦИЯ";
+  }
+
+
   function finishLoader() {
-    if (loaderFinished) return;
 
     loaderFinished = true;
 
-    if (loader) {
-      loader.classList.add("ready");
-    }
+    setLoaderProgress(100);
 
-    if (loaderProgress) {
-      loaderProgress.style.width = "100%";
-    }
+    document.querySelectorAll(".loader-check")
+      .forEach(check => {
+        check.classList.remove("active");
+        check.classList.add("done");
+      });
 
-    if (loaderStatus) {
-      loaderStatus.textContent = "СИСТЕМА ГОТОВА";
-    }
+    loaderState.textContent = "СИСТЕМА ГОТОВА";
+    loaderReady.textContent = "ONLINE";
 
-    soundSystemReady();
+    soundReady();
 
     setTimeout(() => {
-      if (!loader) return;
+      loader.classList.add("is-hidden");
 
-      loader.style.opacity = "0";
-      loader.style.pointerEvents = "none";
+      document.body.classList.add("system-ready");
 
-      setTimeout(() => {
-        loader.style.display = "none";
-      }, 700);
-    }, 800);
+      playSceneSound(0);
+
+    }, 850);
   }
 
-  function runLoader() {
-    if (!loader) {
-      loaderFinished = true;
-      return;
-    }
 
-    const totalSteps = Math.max(loaderChecks.length, 5);
-    const stepDuration = 690;
+  function startLoader() {
 
-    let currentStep = 0;
+    if (loaderStarted || loaderFinished) return;
 
-    updateLoader(0);
+    loaderStarted = true;
 
-    if (loaderStatus) {
-      loaderStatus.textContent = "СИСТЕМА ЗАПУСКАЕТСЯ";
-    }
+    loader.classList.remove("needs-activation");
 
-    if (loaderProgress) {
-      loaderProgress.style.width = "0%";
-    }
+    soundBoot();
 
-    loaderTimer = setInterval(() => {
-      if (currentStep < totalSteps) {
-        updateLoader(currentStep);
+    let step = 0;
+    let progress = 0;
 
-        if (loaderStatus) {
-          const current = loaderChecks[currentStep];
+    activateLoaderCheck(0);
 
-          if (current) {
-            const text =
-              current.querySelector(".loader-check-name");
+    const timer = setInterval(() => {
 
-            if (text) {
-              loaderStatus.textContent =
-                text.textContent.trim();
-            }
-          }
-        }
+      progress += 2.5;
 
-        soundSystemCheck();
+      setLoaderProgress(progress);
 
-        currentStep++;
+      const expectedStep =
+        Math.min(
+          loaderTexts.length - 1,
+          Math.floor(progress / 20)
+        );
 
-        if (loaderProgress) {
-          const percent =
-            Math.min(
-              (currentStep / totalSteps) * 100,
-              100
-            );
+      if (expectedStep !== step) {
+        step = expectedStep;
+        activateLoaderCheck(step);
+        soundCheck(step);
+      }
 
-          loaderProgress.style.width =
-            `${percent}%`;
-        }
-      } else {
-        clearInterval(loaderTimer);
-        loaderTimer = null;
-
-        updateLoader(totalSteps);
-
-        if (loaderStatus) {
-          loaderStatus.textContent = "СИСТЕМА ГОТОВА";
-        }
-
+      if (progress >= 100) {
+        clearInterval(timer);
         finishLoader();
       }
-    }, stepDuration);
+
+    }, 105);
   }
 
+
+  async function activateFromUser() {
+
+    await unlockAudio();
+
+    if (!loaderStarted && !loaderFinished) {
+      startLoader();
+    }
+  }
+
+
+  loaderStart?.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    await activateFromUser();
+  });
+
+
+  /*
+    Автоматически пытаемся создать AudioContext.
+    Сам звук браузер всё равно разрешит только после жеста.
+    Поэтому при первом касании запускается loader.
+  */
+
+  document.addEventListener(
+    "pointerdown",
+    activateFromUser,
+    { once: false, passive: true }
+  );
+
+  document.addEventListener(
+    "touchstart",
+    activateFromUser,
+    { once: false, passive: true }
+  );
+
+  document.addEventListener(
+    "keydown",
+    activateFromUser,
+    { once: false }
+  );
+
+
+  /*
+    Если браузер разрешил звук автоматически,
+    loader запускается сам.
+    Если нет, ждём первый жест.
+  */
+
+  window.addEventListener("load", () => {
+
+    setTimeout(async () => {
+
+      const ctx = getAudioContext();
+
+      if (ctx && ctx.state === "running") {
+        audioUnlocked = true;
+        startLoader();
+      } else {
+        loader.classList.add("needs-activation");
+      }
+
+    }, 250);
+
+  });
+
+
   /* =========================================================
-     SCENE ACTIVATION
-     ========================================================= */
+     SCENE POSITION
+  ========================================================== */
 
-  function setSceneActive(index) {
-    scenes.forEach((scene, i) => {
-      scene.classList.toggle("active", i === index);
-    });
+  function clampScene(index) {
+    return Math.max(
+      0,
+      Math.min(SCENE_COUNT - 1, index)
+    );
+  }
 
-    if (progressCurrent) {
-      progressCurrent.textContent =
-        String(index + 1).padStart(2, "0");
+
+  function renderSceneImmediate(index) {
+
+    const safeIndex = clampScene(index);
+
+    currentScene = safeIndex;
+    targetScene = safeIndex;
+
+    track.style.transform =
+      `translate3d(${-safeIndex * 100}vw, 0, 0)`;
+
+    updateSceneUI();
+
+    document.querySelectorAll(".scene")
+      .forEach((scene, i) => {
+        scene.classList.toggle(
+          "is-active",
+          i === safeIndex
+        );
+      });
+  }
+
+
+  function updateSceneUI() {
+
+    if (sceneCurrent) {
+      sceneCurrent.textContent =
+        String(currentScene + 1).padStart(2, "0");
     }
 
-    if (progressTotal) {
-      progressTotal.textContent =
-        String(sceneCount).padStart(2, "0");
+    if (sceneProgress) {
+      sceneProgress.style.width =
+        `${((currentScene + 1) / SCENE_COUNT) * 100}%`;
     }
 
-    if (progressBar) {
-      progressBar.style.width =
-        `${((index + 1) / sceneCount) * 100}%`;
+    if (sceneHint) {
+
+      if (currentScene === 0) {
+        sceneHint.textContent =
+          "СВАЙПНИТЕ ИЛИ ПЕРЕМЕЩАЙТЕ КУРСОР";
+      } else if (currentScene === SCENE_COUNT - 1) {
+        sceneHint.textContent =
+          "ОБЪЕКТ ГОТОВ";
+      } else {
+        sceneHint.textContent =
+          "ПРОДОЛЖИТЬ";
+      }
+    }
+  }
+
+
+  function activateScene(index) {
+
+    document.querySelectorAll(".scene")
+      .forEach((scene, i) => {
+        scene.classList.toggle(
+          "is-active",
+          i === index
+        );
+      });
+
+    if (networkSoundTimer && index !== 6) {
+      clearInterval(networkSoundTimer);
+      networkSoundTimer = null;
     }
 
     playSceneSound(index);
   }
 
-  function applyScene(index, animate = true) {
-    if (!track) return;
 
-    const offset = index * 100;
+  function animateToScene(index, options = {}) {
 
-    track.style.transition = animate
-      ? "transform 720ms cubic-bezier(0.22, 1, 0.36, 1)"
-      : "none";
+    const safeIndex = clampScene(index);
 
-    track.style.transform =
-      `translate3d(-${offset}vw, 0, 0)`;
+    targetScene = safeIndex;
 
-    setSceneActive(index);
-  }
+    if (isAnimating) return;
 
-  function goToScene(index, animate = true) {
-    if (sceneCount <= 0) return;
+    isAnimating = true;
 
-    const nextIndex = Math.max(
-      0,
-      Math.min(index, sceneCount - 1)
-    );
+    const startScene = currentScene;
+    const endScene = safeIndex;
 
-    if (nextIndex === sceneIndex) {
+    if (startScene === endScene) {
+      isAnimating = false;
       return;
     }
 
-    if (isAnimating) {
-      return;
-    }
-
-    isAnimating = animate;
+    const start = performance.now();
+    const duration = options.duration || 650;
 
     soundTransition();
 
-    sceneIndex = nextIndex;
+    function frame(now) {
 
-    applyScene(sceneIndex, animate);
+      const elapsed = now - start;
+      const raw = Math.min(1, elapsed / duration);
 
-    if (animate) {
-      setTimeout(() => {
+      const eased =
+        1 - Math.pow(1 - raw, 4);
+
+      const value =
+        startScene + (endScene - startScene) * eased;
+
+      track.style.transform =
+        `translate3d(${-value * 100}vw, 0, 0)`;
+
+      if (raw < 1) {
+        animationFrame =
+          requestAnimationFrame(frame);
+      } else {
+
+        currentScene = endScene;
+
+        track.style.transform =
+          `translate3d(${-endScene * 100}vw, 0, 0)`;
+
         isAnimating = false;
-      }, 760);
-    } else {
-      isAnimating = false;
+        animationFrame = null;
+
+        updateSceneUI();
+        activateScene(endScene);
+      }
     }
 
-    updateHash();
+    animationFrame =
+      requestAnimationFrame(frame);
   }
 
-  function updateHash() {
-    try {
-      history.replaceState(
-        null,
-        "",
-        `#scene-${sceneIndex + 1}`
-      );
-    } catch (_) {}
+
+  function nextScene() {
+    animateToScene(currentScene + 1);
   }
 
-  function readHash() {
-    const match =
-      window.location.hash.match(
-        /scene-(\d+)/i
-      );
 
-    if (!match) return 0;
-
-    const number = parseInt(match[1], 10);
-
-    if (!Number.isFinite(number)) {
-      return 0;
-    }
-
-    return Math.max(
-      0,
-      Math.min(number - 1, sceneCount - 1)
-    );
+  function previousScene() {
+    animateToScene(currentScene - 1);
   }
+
 
   /* =========================================================
      WHEEL
-     ========================================================= */
+  ========================================================== */
 
-  function handleWheel(event) {
-    event.preventDefault();
-
-    if (wheelLock || isAnimating) {
-      return;
-    }
-
-    const delta =
-      Math.abs(event.deltaX) > Math.abs(event.deltaY)
-        ? event.deltaX
-        : event.deltaY;
-
-    if (Math.abs(delta) < 10) {
-      return;
-    }
-
-    wheelLock = true;
-
-    if (delta > 0) {
-      goToScene(sceneIndex + 1);
-    } else {
-      goToScene(sceneIndex - 1);
-    }
-
-    setTimeout(() => {
-      wheelLock = false;
-    }, 800);
-  }
-
-  window.addEventListener(
+  experience.addEventListener(
     "wheel",
-    handleWheel,
+    (event) => {
+
+      event.preventDefault();
+
+      if (wheelLocked || isAnimating) return;
+
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+
+      if (Math.abs(delta) < 8) return;
+
+      wheelLocked = true;
+
+      if (delta > 0) {
+        nextScene();
+      } else {
+        previousScene();
+      }
+
+      clearTimeout(wheelTimer);
+
+      wheelTimer = setTimeout(() => {
+        wheelLocked = false;
+      }, 720);
+
+    },
     { passive: false }
   );
 
+
   /* =========================================================
      POINTER DRAG
-     ========================================================= */
+  ========================================================== */
 
-  function pointerDown(event) {
-    if (
-      event.target.closest("a") ||
-      event.target.closest("button")
-    ) {
+  experience.addEventListener("pointerdown", (event) => {
+
+    if (event.pointerType === "mouse" && event.button !== 0) {
       return;
     }
 
-    isDragging = true;
-    dragStartX = event.clientX;
-    dragCurrentX = event.clientX;
-    dragStartScene = sceneIndex;
+    pointerDown = true;
 
-    if (track) {
-      track.style.transition = "none";
-    }
-  }
+    pointerStartX = event.clientX;
+    pointerCurrentX = event.clientX;
+    pointerStartScene = currentScene;
 
-  function pointerMove(event) {
-    if (!isDragging || !track) {
-      return;
-    }
+    experience.setPointerCapture?.(event.pointerId);
 
-    dragCurrentX = event.clientX;
+  });
+
+
+  experience.addEventListener("pointermove", (event) => {
+
+    if (!pointerDown || isAnimating) return;
+
+    pointerCurrentX = event.clientX;
 
     const delta =
-      dragCurrentX - dragStartX;
+      pointerCurrentX - pointerStartX;
 
-    const viewportWidth =
-      window.innerWidth;
+    const width = window.innerWidth;
 
-    const base =
-      dragStartScene * viewportWidth;
+    const movement =
+      delta / width;
 
-    const position =
-      base - delta;
+    let visualScene =
+      pointerStartScene - movement;
 
-    const maxPosition =
-      (sceneCount - 1) * viewportWidth;
-
-    const clamped =
-      Math.max(
-        0,
-        Math.min(position, maxPosition)
-      );
+    visualScene = Math.max(
+      0,
+      Math.min(SCENE_COUNT - 1, visualScene)
+    );
 
     track.style.transform =
-      `translate3d(-${clamped}px, 0, 0)`;
-  }
+      `translate3d(${-visualScene * 100}vw, 0, 0)`;
 
-  function pointerUp() {
-    if (!isDragging) {
-      return;
-    }
+  });
 
-    isDragging = false;
+
+  function finishPointerDrag() {
+
+    if (!pointerDown) return;
+
+    pointerDown = false;
 
     const delta =
-      dragCurrentX - dragStartX;
+      pointerCurrentX - pointerStartX;
 
     const threshold =
-      Math.min(
-        window.innerWidth * 0.16,
-        180
-      );
+      Math.max(45, window.innerWidth * 0.08);
 
     if (Math.abs(delta) > threshold) {
+
       if (delta < 0) {
-        goToScene(dragStartScene + 1);
+        animateToScene(pointerStartScene + 1);
       } else {
-        goToScene(dragStartScene - 1);
+        animateToScene(pointerStartScene - 1);
       }
+
     } else {
-      applyScene(sceneIndex, true);
+      animateToScene(pointerStartScene);
     }
   }
 
-  window.addEventListener(
-    "pointerdown",
-    pointerDown,
-    { passive: true }
-  );
 
-  window.addEventListener(
-    "pointermove",
-    pointerMove,
-    { passive: true }
-  );
-
-  window.addEventListener(
+  experience.addEventListener(
     "pointerup",
-    pointerUp,
-    { passive: true }
+    finishPointerDrag
   );
 
-  window.addEventListener(
+  experience.addEventListener(
     "pointercancel",
-    pointerUp,
-    { passive: true }
+    finishPointerDrag
   );
+
+  experience.addEventListener(
+    "lostpointercapture",
+    finishPointerDrag
+  );
+
 
   /* =========================================================
      TOUCH
-     ========================================================= */
+  ========================================================== */
 
-  function touchStart(event) {
-    if (!event.touches.length) return;
-
-    const touch =
-      event.touches[0];
-
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-  }
-
-  function touchEnd(event) {
-    if (!event.changedTouches.length) {
-      return;
-    }
-
-    const touch =
-      event.changedTouches[0];
-
-    const deltaX =
-      touch.clientX - touchStartX;
-
-    const deltaY =
-      touch.clientY - touchStartY;
-
-    if (Math.abs(deltaX) < 35) {
-      return;
-    }
-
-    if (
-      Math.abs(deltaX) <=
-      Math.abs(deltaY)
-    ) {
-      return;
-    }
-
-    if (deltaX < 0) {
-      goToScene(sceneIndex + 1);
-    } else {
-      goToScene(sceneIndex - 1);
-    }
-  }
-
-  window.addEventListener(
+  experience.addEventListener(
     "touchstart",
-    touchStart,
+    (event) => {
+
+      if (!event.touches.length) return;
+
+      touchStartX =
+        event.touches[0].clientX;
+
+      touchStartY =
+        event.touches[0].clientY;
+
+    },
     { passive: true }
   );
 
-  window.addEventListener(
+
+  experience.addEventListener(
     "touchend",
-    touchEnd,
+    (event) => {
+
+      if (!event.changedTouches.length) return;
+
+      const endX =
+        event.changedTouches[0].clientX;
+
+      const endY =
+        event.changedTouches[0].clientY;
+
+      const dx =
+        endX - touchStartX;
+
+      const dy =
+        endY - touchStartY;
+
+      if (Math.abs(dx) < 45) return;
+
+      if (Math.abs(dx) < Math.abs(dy)) return;
+
+      if (dx < 0) {
+        nextScene();
+      } else {
+        previousScene();
+      }
+
+    },
     { passive: true }
   );
+
 
   /* =========================================================
      KEYBOARD
-     ========================================================= */
+  ========================================================== */
 
-  function handleKeyboard(event) {
-    if (
-      event.target &&
-      (
-        event.target.tagName === "INPUT" ||
-        event.target.tagName === "TEXTAREA"
-      )
-    ) {
-      return;
+  document.addEventListener("keydown", (event) => {
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      nextScene();
     }
 
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        event.preventDefault();
-        goToScene(sceneIndex + 1);
-        break;
-
-      case "ArrowLeft":
-      case "ArrowUp":
-        event.preventDefault();
-        goToScene(sceneIndex - 1);
-        break;
-
-      case "Home":
-        event.preventDefault();
-        goToScene(0);
-        break;
-
-      case "End":
-        event.preventDefault();
-        goToScene(sceneCount - 1);
-        break;
-
-      case "Escape":
-        if (menu) {
-          menu.classList.remove("open");
-        }
-        break;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      previousScene();
     }
-  }
 
-  window.addEventListener(
-    "keydown",
-    handleKeyboard
-  );
+    if (event.key === "Home") {
+      event.preventDefault();
+      animateToScene(0);
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      animateToScene(SCENE_COUNT - 1);
+    }
+
+  });
+
 
   /* =========================================================
      MOBILE MENU
-     ========================================================= */
+  ========================================================== */
 
-  if (menuButton && menu) {
-    menuButton.addEventListener(
-      "click",
-      (event) => {
-        event.stopPropagation();
+  menuButton?.addEventListener("click", () => {
 
-        unlockAudio();
+    const open =
+      mobileMenu.classList.toggle("is-open");
 
-        menu.classList.toggle("open");
-      }
+    menuButton.classList.toggle(
+      "is-open",
+      open
     );
-  }
 
-  document.addEventListener(
-    "click",
-    (event) => {
-      if (!menu || !menuButton) {
-        return;
-      }
+  });
 
-      if (
-        menu.classList.contains("open") &&
-        !menu.contains(event.target) &&
-        !menuButton.contains(event.target)
-      ) {
-        menu.classList.remove("open");
-      }
+
+  mobileMenu?.addEventListener("click", (event) => {
+
+    if (event.target.closest("a")) {
+      mobileMenu.classList.remove("is-open");
+      menuButton.classList.remove("is-open");
     }
-  );
+
+  });
+
 
   /* =========================================================
-     NETWORK
-     ========================================================= */
+     IMAGE PARALLAX
+  ========================================================== */
 
-  const networkSvg =
-    document.querySelector(".network-svg");
+  function setupParallax() {
 
-  const networkNodes =
-    [...document.querySelectorAll(".network-node")];
+    const scenes =
+      document.querySelectorAll(".scene");
 
-  const networkSignals =
-    [...document.querySelectorAll(".network-signal")];
+    scenes.forEach((scene) => {
 
-  let networkAnimationFrame = null;
-  let networkStartTime = performance.now();
+      const image =
+        scene.querySelector(".media-frame img");
 
-  function animateNetwork(time) {
-    if (!networkSvg) {
-      return;
-    }
+      if (!image) return;
 
-    const elapsed =
-      (time - networkStartTime) / 1000;
+      scene.addEventListener(
+        "pointermove",
+        (event) => {
 
-    networkSignals.forEach((signal, index) => {
-      const path =
-        document.querySelector(
-          `.network-line[data-index="${index}"]`
-        );
+          if (window.innerWidth < 901) return;
 
-      if (!path) return;
+          const rect =
+            scene.getBoundingClientRect();
 
-      const length =
-        path.getTotalLength();
+          const x =
+            (event.clientX - rect.left) /
+            rect.width;
 
-      const speed =
-        0.16 + index * 0.025;
+          const y =
+            (event.clientY - rect.top) /
+            rect.height;
 
-      const progress =
-        (elapsed * speed) % 1;
+          const px =
+            (x - .5) * -8;
 
-      const point =
-        path.getPointAtLength(
-          progress * length
-        );
+          const py =
+            (y - .5) * -4;
 
-      signal.setAttribute(
-        "cx",
-        point.x
+          image.style.transform =
+            `scale(1.035) translate3d(${px}px, ${py}px, 0)`;
+
+        }
       );
 
-      signal.setAttribute(
-        "cy",
-        point.y
+      scene.addEventListener(
+        "pointerleave",
+        () => {
+          image.style.transform =
+            "scale(1.035) translate3d(0,0,0)";
+        }
       );
+
     });
 
-    if (
-      sceneIndex === 6 &&
-      elapsed > 0.2
-    ) {
-      soundNetwork();
-    }
-
-    networkAnimationFrame =
-      requestAnimationFrame(
-        animateNetwork
-      );
   }
 
-  if (networkSvg) {
-    networkAnimationFrame =
-      requestAnimationFrame(
-        animateNetwork
-      );
-  }
 
-  /* =========================================================
-     PARALLAX
-     ========================================================= */
+  setupParallax();
 
-  const images =
-    [...document.querySelectorAll(".media-frame img")];
-
-  function applyParallax(event) {
-    if (!window.matchMedia("(min-width: 1100px)").matches) {
-      return;
-    }
-
-    const x =
-      (event.clientX / window.innerWidth - 0.5);
-
-    const y =
-      (event.clientY / window.innerHeight - 0.5);
-
-    images.forEach((image) => {
-      image.style.transform =
-        `scale(1.01) translate3d(${x * 5}px, ${y * 3}px, 0)`;
-    });
-  }
-
-  window.addEventListener(
-    "pointermove",
-    applyParallax,
-    { passive: true }
-  );
 
   /* =========================================================
      RESIZE
-     ========================================================= */
+  ========================================================== */
 
-  let resizeTimer = null;
+  window.addEventListener("resize", () => {
 
-  function handleResize() {
-    clearTimeout(resizeTimer);
+    if (!isAnimating) {
+      renderSceneImmediate(currentScene);
+    }
 
-    resizeTimer = setTimeout(() => {
-      applyScene(sceneIndex, false);
-    }, 120);
+  });
+
+
+  /* =========================================================
+     HASH
+  ========================================================== */
+
+  function readHash() {
+
+    const match =
+      window.location.hash.match(/scene-(\d+)/);
+
+    if (!match) return;
+
+    const value =
+      parseInt(match[1], 10);
+
+    if (
+      Number.isFinite(value) &&
+      value >= 0 &&
+      value < SCENE_COUNT
+    ) {
+      renderSceneImmediate(value);
+    }
+
   }
 
+
   window.addEventListener(
-    "resize",
-    handleResize
+    "hashchange",
+    readHash
   );
+
 
   /* =========================================================
      INIT
-     ========================================================= */
+  ========================================================== */
 
-  function init() {
-    sceneCount = scenes.length;
+  renderSceneImmediate(0);
+  updateSceneUI();
 
-    if (progressTotal) {
-      progressTotal.textContent =
-        String(sceneCount).padStart(2, "0");
-    }
-
-    createSoundControl();
-
-    sceneIndex = readHash();
-
-    applyScene(
-      sceneIndex,
-      false
-    );
-
-    runLoader();
-  }
-
-  init();
 })();
