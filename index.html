@@ -59,6 +59,7 @@
 
       <div class="loader-progress">
         <span id="loaderProgress">0%</span>
+
         <div class="loader-progress-line">
           <span id="loaderProgressBar"></span>
         </div>
@@ -74,7 +75,9 @@
 
   <header class="site-header">
 
-    <div class="header-brand">SENTRA</div>
+    <div class="header-brand">
+      SENTRA
+    </div>
 
     <a
       class="header-cta"
@@ -86,17 +89,25 @@
     </a>
 
     <div class="header-right">
+
       <span class="system-status">
         <i></i>
         СИСТЕМА АКТИВНА
       </span>
 
-      <span class="clock" id="clock">00:00:00</span>
+      <span class="clock" id="clock">
+        00:00:00
+      </span>
 
-      <button class="menu-button" id="menuButton" aria-label="Открыть меню">
+      <button
+        class="menu-button"
+        id="menuButton"
+        aria-label="Открыть меню"
+      >
         <span></span>
         <span></span>
       </button>
+
     </div>
 
   </header>
@@ -172,7 +183,7 @@
   <main class="experience" id="experience">
 
 
-    <!-- SCENE 01 -->
+    <!-- 01 -->
 
     <section class="scene scene-object" data-scene="0">
 
@@ -214,8 +225,8 @@
         <div class="scan-object"></div>
 
         <div class="media-caption">
-          <span>OBJECT / 001</span>
-          <span>CONTROL ZONE</span>
+          <span>ОБЪЕКТ / 001</span>
+          <span>ЗОНА КОНТРОЛЯ</span>
         </div>
 
       </div>
@@ -223,7 +234,7 @@
     </section>
 
 
-    <!-- SCENE 02 -->
+    <!-- 02 -->
 
     <section class="scene scene-surveillance" data-scene="1">
 
@@ -262,9 +273,11 @@
         <div class="media-dark"></div>
 
         <div class="camera-grid">
+
           <span class="grid-line horizontal h1"></span>
           <span class="grid-line horizontal h2"></span>
           <span class="grid-line horizontal h3"></span>
+
           <span class="grid-line vertical v1"></span>
           <span class="grid-line vertical v2"></span>
           <span class="grid-line vertical v3"></span>
@@ -273,11 +286,12 @@
           <span class="grid-bracket bottom"></span>
 
           <span class="grid-point"></span>
+
         </div>
 
         <div class="camera-label">
-          <span>CAM / 04</span>
-          <span>AREA SCAN</span>
+          <span>КАМЕРА / 04</span>
+          <span>СКАНИРОВАНИЕ</span>
         </div>
 
       </div>
@@ -285,7 +299,7 @@
     </section>
 
 
-    <!-- SCENE 03 -->
+    <!-- 03 -->
 
     <section class="scene scene-detection" data-scene="2">
 
@@ -343,7 +357,7 @@
         </div>
 
         <div class="detection-label">
-          ИЗМЕНЕНИЕ / DETECTED
+          ИЗМЕНЕНИЕ / ЗАФИКСИРОВАНО
         </div>
 
       </div>
@@ -351,7 +365,7 @@
     </section>
 
 
-    <!-- SCENE 04 -->
+    <!-- 04 -->
 
     <section class="scene scene-access" data-scene="3">
 
@@ -397,8 +411,8 @@
         </div>
 
         <div class="access-label">
-          ACCESS<br>
-          VERIFIED
+          ДОСТУП<br>
+          ПОДТВЕРЖДЁН
         </div>
 
       </div>
@@ -406,7 +420,7 @@
     </section>
 
 
-    <!-- SCENE 05 -->
+    <!-- 05 -->
 
     <section class="scene scene-threat" data-scene="4">
 
@@ -435,7 +449,7 @@
 
       </div>
 
-      <div class="scene-media">
+      <div class="scene-media threat-media">
 
         <img
           src="IMG_8752.png"
@@ -443,18 +457,49 @@
           draggable="false"
         >
 
-        <div class="media-dark"></div>
+        <div class="threat-overlay"></div>
 
-        <div class="threat-signals">
+        <div class="threat-interface">
 
-          <span class="threat-word word-fire">ПОЖАР</span>
-          <span class="threat-word word-intrusion">ПРОНИКНОВЕНИЕ</span>
-          <span class="threat-word word-alarm">ТРЕВОГА</span>
+          <div class="threat-topline">
+            <span>СИСТЕМА / 05</span>
+            <span>ТРЕВОЖНЫЙ РЕЖИМ</span>
+          </div>
 
-        </div>
+          <div class="threat-center">
 
-        <div class="threat-main-label">
-          THREAT DETECTED
+            <div class="threat-ring">
+              <span></span>
+            </div>
+
+            <div class="threat-word word-fire">
+              ПОЖАР
+            </div>
+
+            <div class="threat-word word-intrusion">
+              ПРОНИКНОВЕНИЕ
+            </div>
+
+            <div class="threat-word word-alarm">
+              ТРЕВОГА
+            </div>
+
+          </div>
+
+          <div class="threat-bottom">
+
+            <span class="threat-line"></span>
+
+            <strong>
+              ОПАСНОСТЬ ОБНАРУЖЕНА
+            </strong>
+
+            <small>
+              СИГНАЛ ПЕРЕДАН В ЦЕНТР КОНТРОЛЯ
+            </small>
+
+          </div>
+
         </div>
 
       </div>
@@ -462,7 +507,7 @@
     </section>
 
 
-    <!-- SCENE 06 -->
+    <!-- 06 -->
 
     <section class="scene scene-service" data-scene="5">
 
@@ -491,7 +536,7 @@
 
       </div>
 
-      <div class="scene-media">
+      <div class="scene-media service-media">
 
         <img
           src="IMG_8753.png"
@@ -499,44 +544,54 @@
           draggable="false"
         >
 
-        <div class="media-dark"></div>
+        <div class="service-image-overlay"></div>
 
-        <div class="service-checks">
+        <div class="service-interface">
 
-          <div class="service-row">
-            <span>01</span>
-            <strong>ОБОРУДОВАНИЕ</strong>
-            <i>OK</i>
+          <div class="service-top">
+            <span>ТЕХНИЧЕСКОЕ ОБСЛУЖИВАНИЕ</span>
+            <span>ОБЪЕКТ / 001</span>
           </div>
 
-          <div class="service-row">
-            <span>02</span>
-            <strong>СОЕДИНЕНИЕ</strong>
-            <i>OK</i>
+          <div class="service-checks">
+
+            <div class="service-row">
+              <span>01</span>
+              <strong>ОБОРУДОВАНИЕ</strong>
+              <i>ОК</i>
+            </div>
+
+            <div class="service-row">
+              <span>02</span>
+              <strong>СОЕДИНЕНИЕ</strong>
+              <i>ОК</i>
+            </div>
+
+            <div class="service-row">
+              <span>03</span>
+              <strong>ПИТАНИЕ</strong>
+              <i>ОК</i>
+            </div>
+
+            <div class="service-row">
+              <span>04</span>
+              <strong>СИГНАЛ</strong>
+              <i>ОК</i>
+            </div>
+
+            <div class="service-row">
+              <span>05</span>
+              <strong>СОСТОЯНИЕ</strong>
+              <i>ОК</i>
+            </div>
+
           </div>
 
-          <div class="service-row">
-            <span>03</span>
-            <strong>ПИТАНИЕ</strong>
-            <i>OK</i>
+          <div class="service-bottom">
+            <span></span>
+            <strong>СИСТЕМА В НОРМЕ</strong>
           </div>
 
-          <div class="service-row">
-            <span>04</span>
-            <strong>СИГНАЛ</strong>
-            <i>OK</i>
-          </div>
-
-          <div class="service-row">
-            <span>05</span>
-            <strong>СОСТОЯНИЕ</strong>
-            <i>OK</i>
-          </div>
-
-        </div>
-
-        <div class="service-complete">
-          SYSTEM CHECK COMPLETE
         </div>
 
       </div>
@@ -544,7 +599,7 @@
     </section>
 
 
-    <!-- SCENE 07 -->
+    <!-- 07 -->
 
     <section class="scene scene-network" data-scene="6">
 
@@ -587,33 +642,74 @@
 
           <div class="network-center">
             <span class="center-pulse"></span>
+
             <strong>SENTRA</strong>
-            <small>CENTRAL CONTROL</small>
+
+            <small>
+              ЦЕНТР КОНТРОЛЯ
+            </small>
           </div>
+
 
           <div class="network-node node-cctv">
+
             <span></span>
-            <strong>CCTV</strong>
-            <small>ONLINE</small>
+
+            <strong>
+              ВИДЕОНАБЛЮДЕНИЕ
+            </strong>
+
+            <small>
+              ОНЛАЙН
+            </small>
+
           </div>
+
 
           <div class="network-node node-fire">
+
             <span></span>
-            <strong>FIRE</strong>
-            <small>ONLINE</small>
+
+            <strong>
+              ПОЖАРНАЯ СИСТЕМА
+            </strong>
+
+            <small>
+              ОНЛАЙН
+            </small>
+
           </div>
+
 
           <div class="network-node node-access">
+
             <span></span>
-            <strong>ACCESS</strong>
-            <small>ONLINE</small>
+
+            <strong>
+              СКУД
+            </strong>
+
+            <small>
+              ОНЛАЙН
+            </small>
+
           </div>
 
+
           <div class="network-node node-service">
+
             <span></span>
-            <strong>SERVICE</strong>
-            <small>ONLINE</small>
+
+            <strong>
+              ОБСЛУЖИВАНИЕ
+            </strong>
+
+            <small>
+              ОНЛАЙН
+            </small>
+
           </div>
+
 
           <svg
             class="network-svg"
@@ -642,19 +738,26 @@
               d="M 840 580 C 700 540 620 440 500 350"
             />
 
-            <circle class="network-signal signal-1" r="5" cx="160" cy="120">
+            <circle
+              class="network-signal"
+              r="5"
+              cx="160"
+              cy="120"
+            >
               <animate
                 attributeName="cx"
                 values="160;500"
                 dur="2.4s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="cy"
                 values="120;350"
                 dur="2.4s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="opacity"
                 values="0;1;1;0"
@@ -663,7 +766,13 @@
               />
             </circle>
 
-            <circle class="network-signal signal-2" r="5" cx="840" cy="120">
+
+            <circle
+              class="network-signal"
+              r="5"
+              cx="840"
+              cy="120"
+            >
               <animate
                 attributeName="cx"
                 values="840;500"
@@ -671,6 +780,7 @@
                 begin=".6s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="cy"
                 values="120;350"
@@ -678,6 +788,7 @@
                 begin=".6s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="opacity"
                 values="0;1;1;0"
@@ -687,7 +798,13 @@
               />
             </circle>
 
-            <circle class="network-signal signal-3" r="5" cx="160" cy="580">
+
+            <circle
+              class="network-signal"
+              r="5"
+              cx="160"
+              cy="580"
+            >
               <animate
                 attributeName="cx"
                 values="160;500"
@@ -695,6 +812,7 @@
                 begin="1.2s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="cy"
                 values="580;350"
@@ -702,6 +820,7 @@
                 begin="1.2s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="opacity"
                 values="0;1;1;0"
@@ -711,7 +830,13 @@
               />
             </circle>
 
-            <circle class="network-signal signal-4" r="5" cx="840" cy="580">
+
+            <circle
+              class="network-signal"
+              r="5"
+              cx="840"
+              cy="580"
+            >
               <animate
                 attributeName="cx"
                 values="840;500"
@@ -719,6 +844,7 @@
                 begin="1.8s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="cy"
                 values="580;350"
@@ -726,6 +852,7 @@
                 begin="1.8s"
                 repeatCount="indefinite"
               />
+
               <animate
                 attributeName="opacity"
                 values="0;1;1;0"
@@ -740,7 +867,7 @@
         </div>
 
         <div class="network-complete">
-          ALL SYSTEMS ONLINE
+          ВСЕ СИСТЕМЫ В СЕТИ
         </div>
 
       </div>
@@ -748,7 +875,7 @@
     </section>
 
 
-    <!-- SCENE 08 -->
+    <!-- 08 -->
 
     <section class="scene scene-final" data-scene="7">
 
@@ -822,7 +949,7 @@
         </div>
 
         <div class="object-ready">
-          OBJECT / READY
+          ОБЪЕКТ / ГОТОВ
         </div>
 
       </div>
