@@ -1,1068 +1,540 @@
-(() => {
-  "use strict";
+const VK_URL = "https://vk.ru/id_aikharisov";
 
+const loader = document.getElementById("loader");
+const loaderProgress = document.getElementById("loaderProgress");
+const loaderStatus = document.getElementById("loaderStatus");
 
-  /* =======================================================
-     ELEMENTS
-  ======================================================== */
+const track = document.getElementById("track");
+const experience = document.getElementById("experience");
+const scenes = Array.from(document.querySelectorAll(".scene"));
 
-  const loader = document.getElementById("loader");
-  const loaderCounter = document.getElementById("loaderCounter");
+const sceneNumber = document.getElementById("sceneNumber");
+const progressFill = document.getElementById("progressFill");
+const navigationHint = document.getElementById("navigationHint");
 
-  const track = document.getElementById("track");
-  const experience = document.getElementById("experience");
+const headerCta = document.getElementById("headerCta");
+const finalCta = document.getElementById("finalCta");
 
-  const scenes = Array.from(
-    document.querySelectorAll(".scene")
+const menuButton = document.getElementById("menuButton");
+const mobileMenu = document.getElementById("mobileMenu");
+const mobileCta = document.getElementById("mobileCta");
+
+const liveDate = document.getElementById("liveDate");
+const liveTime = document.getElementById("liveTime");
+
+let currentIndex = 0;
+let isMoving = false;
+
+let pointerStartX = 0;
+let pointerStartY = 0;
+let pointerLastX = 0;
+let pointerDown = false;
+let pointerMoved = false;
+
+let touchStartX = 0;
+let touchStartY = 0;
+
+let wheelLocked = false;
+let wheelAccumulator = 0;
+
+const TOTAL_SCENES = scenes.length;
+const MOVE_DURATION = 780;
+
+/* -----------------------------------
+   LOADER
+----------------------------------- */
+
+function runLoader() {
+  let progress = 0;
+
+  const statuses = [
+    "Запуск системы",
+    "Проверка соединения",
+    "Синхронизация узлов",
+    "Подготовка объекта",
+    "Система готова"
+  ];
+
+  const interval = setInterval(() => {
+    progress += Math.floor(Math.random() * 5) + 2;
+
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(interval);
+
+      loaderProgress.textContent = progress;
+      loaderStatus.textContent = statuses[statuses.length - 1];
+
+      setTimeout(() => {
+        loader.classList.add("is-hidden");
+        activateScene(0);
+      }, 500);
+
+      return;
+    }
+
+    loaderProgress.textContent = progress;
+
+    const index = Math.min(
+      statuses.length - 2,
+      Math.floor(progress / 25)
+    );
+
+    loaderStatus.textContent = statuses[index];
+  }, 70);
+}
+
+/* -----------------------------------
+   LIVE DATE / TIME
+----------------------------------- */
+
+function updateClock() {
+  const now = new Date();
+
+  const date = new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(now);
+
+  const time = new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(now);
+
+  liveDate.textContent = date;
+  liveTime.textContent = time;
+}
+
+updateClock();
+setInterval(updateClock, 1000);
+
+/* -----------------------------------
+   NAVIGATION
+----------------------------------- */
+
+function setHash(index) {
+  history.replaceState(
+    null,
+    "",
+    index === 0 ? window.location.pathname : `#${index + 1}`
   );
+}
 
-  const progressNumber =
-    document.getElementById("progressNumber");
+function updateInterface(index) {
+  sceneNumber.textContent = String(index + 1).padStart(2, "0");
 
-  const progressFill =
-    document.getElementById("progressFill");
+  const percentage = ((index + 1) / TOTAL_SCENES) * 100;
+  progressFill.style.width = `${percentage}%`;
 
-  const liveDate =
-    document.getElementById("liveDate");
+  scenes.forEach((scene, sceneIndex) => {
+    scene.classList.toggle("active", sceneIndex === index);
+  });
 
-  const liveTime =
-    document.getElementById("liveTime");
+  if (index > 0) {
+    navigationHint.classList.add("hidden");
+  } else {
+    navigationHint.classList.remove("hidden");
+  }
+}
 
-  const menuButton =
-    document.getElementById("menuButton");
+function activateScene(index) {
+  scenes[index]?.classList.add("active");
+}
 
-  const menuClose =
-    document.getElementById("menuClose");
+function goTo(index, options = {}) {
+  if (index < 0 || index >= TOTAL_SCENES) {
+    return;
+  }
 
-  const mobileMenu =
-    document.getElementById("mobileMenu");
+  if (index === currentIndex && !options.force) {
+    return;
+  }
 
-  const menuLinks =
-    Array.from(
-      document.querySelectorAll("[data-menu-scene]")
-    );
+  if (isMoving && !options.force) {
+    return;
+  }
 
-  const navigationHint =
-    document.getElementById("navigationHint");
+  isMoving = true;
 
+  currentIndex = index;
 
-  /* =======================================================
-     STATE
-  ======================================================== */
+  track.style.transition =
+    `transform ${MOVE_DURATION}ms cubic-bezier(.16,1,.3,1)`;
 
-  const TOTAL = scenes.length;
+  track.style.transform =
+    `translate3d(${-index * 100}vw, 0, 0)`;
 
-  let currentIndex = 0;
+  updateInterface(index);
+  setHash(index);
 
-  let targetIndex = 0;
+  closeMenu();
 
-  let currentX = 0;
+  window.setTimeout(() => {
+    isMoving = false;
+  }, MOVE_DURATION + 80);
+}
 
-  let targetX = 0;
+/* -----------------------------------
+   WHEEL / TRACKPAD
+----------------------------------- */
 
-  let viewportWidth =
-    window.innerWidth;
+function handleWheel(event) {
+  event.preventDefault();
 
-  let isAnimating = false;
+  if (wheelLocked || isMoving) {
+    return;
+  }
 
-  let wheelLocked = false;
+  const delta =
+    Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
 
-  let pointerDown = false;
+  wheelAccumulator += delta;
 
-  let pointerStartX = 0;
+  const threshold = 55;
 
-  let pointerStartY = 0;
+  if (Math.abs(wheelAccumulator) < threshold) {
+    return;
+  }
 
-  let pointerLastX = 0;
+  const direction = wheelAccumulator > 0 ? 1 : -1;
 
-  let pointerMoved = false;
+  wheelAccumulator = 0;
+  wheelLocked = true;
 
-  let touchStartTime = 0;
+  goTo(currentIndex + direction);
 
-  let animationFrame = null;
+  window.setTimeout(() => {
+    wheelLocked = false;
+  }, MOVE_DURATION + 120);
+}
 
-  let initialized = false;
+experience.addEventListener(
+  "wheel",
+  handleWheel,
+  { passive: false }
+);
 
+/* -----------------------------------
+   POINTER DRAG
+----------------------------------- */
 
-  /* =======================================================
-     UTILS
-  ======================================================== */
+experience.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "touch") {
+    return;
+  }
 
-  const clamp = (value, min, max) => {
-    return Math.min(
-      Math.max(value, min),
-      max
-    );
-  };
+  pointerDown = true;
+  pointerMoved = false;
 
+  pointerStartX = event.clientX;
+  pointerStartY = event.clientY;
+  pointerLastX = event.clientX;
 
-  const ease = (t) => {
-    return 1 - Math.pow(1 - t, 4);
-  };
+  experience.setPointerCapture?.(event.pointerId);
 
+  track.style.transition = "none";
+});
 
-  const isMobile = () => {
-    return window.innerWidth <= 650;
-  };
+experience.addEventListener("pointermove", (event) => {
+  if (!pointerDown || isMoving) {
+    return;
+  }
 
+  const deltaX = event.clientX - pointerStartX;
+  const deltaY = event.clientY - pointerStartY;
 
-  const getSceneX = (index) => {
-    return -(index * viewportWidth);
-  };
+  if (Math.abs(deltaX) > 8) {
+    pointerMoved = true;
+  }
 
+  const width = window.innerWidth;
+  const progress = deltaX / width;
 
-  /* =======================================================
-     LOADER
-  ======================================================== */
+  const base = -currentIndex * width;
+  const position = base + deltaX;
 
-  const runLoader = () => {
+  track.style.transform =
+    `translate3d(${position}px,0,0)`;
 
-    let value = 0;
+  pointerLastX = event.clientX;
+});
 
-    const duration = 1900;
+experience.addEventListener("pointerup", (event) => {
+  if (!pointerDown) {
+    return;
+  }
 
-    const start = performance.now();
+  pointerDown = false;
 
-    const update = (now) => {
+  const deltaX = event.clientX - pointerStartX;
+  const threshold = Math.min(130, window.innerWidth * 0.16);
 
-      const progress =
-        Math.min(
-          (now - start) / duration,
-          1
-        );
+  track.style.transition =
+    `transform ${MOVE_DURATION}ms cubic-bezier(.16,1,.3,1)`;
 
-      value =
-        Math.floor(
-          ease(progress) * 100
-        );
-
-      if (loaderCounter) {
-        loaderCounter.textContent =
-          String(value).padStart(2, "0");
-      }
-
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      } else {
-
-        setTimeout(() => {
-
-          loader.classList.add(
-            "is-hidden"
-          );
-
-          document.body.classList.add(
-            "system-ready"
-          );
-
-        }, 280);
-
-      }
-    };
-
-    requestAnimationFrame(update);
-  };
-
-
-  /* =======================================================
-     LIVE DATE / TIME
-  ======================================================== */
-
-  const updateDateTime = () => {
-
-    const now = new Date();
-
-    const date =
-      new Intl.DateTimeFormat(
-        "ru-RU",
-        {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric"
-        }
-      ).format(now);
-
-    const time =
-      new Intl.DateTimeFormat(
-        "ru-RU",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false
-        }
-      ).format(now);
-
-    if (liveDate) {
-      liveDate.textContent = date;
-    }
-
-    if (liveTime) {
-      liveTime.textContent = time;
-    }
-  };
-
-
-  /* =======================================================
-     URL HASH
-  ======================================================== */
-
-  const readHash = () => {
-
-    const hash =
-      window.location.hash;
-
-    if (!hash) {
-      return 0;
-    }
-
-    const match =
-      hash.match(
-        /scene-(\d+)/
-      );
-
-    if (!match) {
-      return 0;
-    }
-
-    const requested =
-      Number(match[1]) - 1;
-
-    return clamp(
-      requested,
-      0,
-      TOTAL - 1
-    );
-  };
-
-
-  const updateHash = (
-    index,
-    replace = false
-  ) => {
-
-    const hash =
-      `#scene-${index + 1}`;
-
-    if (window.location.hash === hash) {
-      return;
-    }
-
-    if (replace) {
-
-      history.replaceState(
-        null,
-        "",
-        hash
-      );
-
+  if (pointerMoved && Math.abs(deltaX) >= threshold) {
+    if (deltaX < 0) {
+      goTo(currentIndex + 1);
     } else {
-
-      history.pushState(
-        null,
-        "",
-        hash
-      );
-
+      goTo(currentIndex - 1);
     }
-  };
+  } else {
+    goTo(currentIndex, { force: true });
+  }
+});
 
+experience.addEventListener("pointercancel", () => {
+  pointerDown = false;
+  goTo(currentIndex, { force: true });
+});
 
-  /* =======================================================
-     PROGRESS
-  ======================================================== */
+/* -----------------------------------
+   TOUCH
+----------------------------------- */
 
-  const updateProgress = (index) => {
-
-    const number =
-      String(index + 1)
-        .padStart(2, "0");
-
-    if (progressNumber) {
-      progressNumber.textContent =
-        number;
+experience.addEventListener(
+  "touchstart",
+  (event) => {
+    if (event.touches.length !== 1) {
+      return;
     }
 
-    if (progressFill) {
+    touchStartX = event.touches[0].clientX;
+    touchStartY = event.touches[0].clientY;
 
-      const percent =
-        ((index + 1) / TOTAL) * 100;
+    track.style.transition = "none";
+  },
+  { passive: true }
+);
 
-      progressFill.style.width =
-        `${percent}%`;
+experience.addEventListener(
+  "touchmove",
+  (event) => {
+    if (event.touches.length !== 1 || isMoving) {
+      return;
     }
-  };
 
+    const currentX = event.touches[0].clientX;
+    const deltaX = currentX - touchStartX;
 
-  /* =======================================================
-     ACTIVE SCENE
-  ======================================================== */
-
-  const setActiveScene = (index) => {
-
-    scenes.forEach(
-      (scene, sceneIndex) => {
-
-        scene.classList.toggle(
-          "is-active",
-          sceneIndex === index
-        );
-
-      }
-    );
-
-    updateProgress(index);
-
-    currentIndex = index;
-  };
-
-
-  /* =======================================================
-     TRACK RENDER
-  ======================================================== */
-
-  const render = () => {
-
-    currentX +=
-      (targetX - currentX) * 0.085;
-
-    if (
-      Math.abs(targetX - currentX)
-      < 0.08
-    ) {
-      currentX = targetX;
-    }
+    const base = -currentIndex * window.innerWidth;
 
     track.style.transform =
-      `translate3d(${currentX}px, 0, 0)`;
+      `translate3d(${base + deltaX}px,0,0)`;
+  },
+  { passive: true }
+);
 
-    animationFrame =
-      requestAnimationFrame(render);
-  };
+experience.addEventListener(
+  "touchend",
+  (event) => {
+    const touch = event.changedTouches[0];
 
-
-  /* =======================================================
-     GO TO SCENE
-  ======================================================== */
-
-  const goToScene = (
-    index,
-    options = {}
-  ) => {
-
-    const {
-      updateUrl = true,
-      instant = false,
-      unlockDelay = 620
-    } = options;
-
-    const next =
-      clamp(
-        index,
-        0,
-        TOTAL - 1
-      );
-
-    targetIndex = next;
-
-    targetX =
-      getSceneX(next);
-
-    setActiveScene(next);
-
-    if (updateUrl) {
-      updateHash(next);
-    }
-
-    if (instant) {
-      currentX = targetX;
-    }
-
-    isAnimating = true;
-
-    clearTimeout(
-      goToScene.unlockTimer
-    );
-
-    goToScene.unlockTimer =
-      setTimeout(() => {
-        isAnimating = false;
-      }, unlockDelay);
-
-    wheelLocked = true;
-
-    clearTimeout(
-      goToScene.wheelTimer
-    );
-
-    goToScene.wheelTimer =
-      setTimeout(() => {
-        wheelLocked = false;
-      }, unlockDelay);
-  };
-
-
-  /* =======================================================
-     NEXT / PREVIOUS
-  ======================================================== */
-
-  const nextScene = () => {
-
-    if (currentIndex >= TOTAL - 1) {
+    if (!touch) {
       return;
     }
 
-    goToScene(
-      currentIndex + 1
-    );
-  };
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
 
-
-  const previousScene = () => {
-
-    if (currentIndex <= 0) {
-      return;
-    }
-
-    goToScene(
-      currentIndex - 1
-    );
-  };
-
-
-  /* =======================================================
-     WHEEL
-  ======================================================== */
-
-  const handleWheel = (event) => {
-
-    event.preventDefault();
-
-    if (wheelLocked || isAnimating) {
-      return;
-    }
-
-    const delta =
-      Math.abs(event.deltaX) >
-      Math.abs(event.deltaY)
-        ? event.deltaX
-        : event.deltaY;
-
-    if (Math.abs(delta) < 4) {
-      return;
-    }
-
-    if (delta > 0) {
-      nextScene();
-    } else {
-      previousScene();
-    }
-  };
-
-
-  /* =======================================================
-     POINTER DRAG
-  ======================================================== */
-
-  const handlePointerDown = (event) => {
-
-    if (event.pointerType === "mouse") {
-
-      pointerDown = true;
-
-      pointerStartX =
-        event.clientX;
-
-      pointerStartY =
-        event.clientY;
-
-      pointerLastX =
-        event.clientX;
-
-      pointerMoved = false;
-
-      experience.classList.add(
-        "is-dragging"
-      );
-
-      try {
-        experience.setPointerCapture(
-          event.pointerId
-        );
-      } catch (_) {}
-
-    }
+    track.style.transition =
+      `transform ${MOVE_DURATION}ms cubic-bezier(.16,1,.3,1)`;
 
     if (
-      event.pointerType === "touch"
+      Math.abs(deltaX) > 65 &&
+      Math.abs(deltaX) > Math.abs(deltaY)
     ) {
-
-      pointerDown = true;
-
-      pointerStartX =
-        event.clientX;
-
-      pointerStartY =
-        event.clientY;
-
-      pointerLastX =
-        event.clientX;
-
-      pointerMoved = false;
-
-      touchStartTime =
-        performance.now();
-
-    }
-  };
-
-
-  const handlePointerMove = (event) => {
-
-    if (!pointerDown) {
-      return;
-    }
-
-    const deltaX =
-      event.clientX -
-      pointerLastX;
-
-    const totalX =
-      event.clientX -
-      pointerStartX;
-
-    const totalY =
-      event.clientY -
-      pointerStartY;
-
-    if (
-      Math.abs(totalX) > 8 ||
-      Math.abs(totalY) > 8
-    ) {
-      pointerMoved = true;
-    }
-
-    if (
-      event.pointerType === "mouse"
-    ) {
-
-      const mostlyHorizontal =
-        Math.abs(totalX) >
-        Math.abs(totalY);
-
-      if (!mostlyHorizontal) {
-        return;
-      }
-
-    }
-
-    pointerLastX =
-      event.clientX;
-
-    if (
-      Math.abs(deltaX) < 0.1
-    ) {
-      return;
-    }
-
-    /*
-      Во время drag разрешаем только
-      визуальное смещение в пределах
-      соседних сцен.
-
-      Никакого свободного улёта на
-      несколько экранов.
-    */
-
-    const minX =
-      getSceneX(TOTAL - 1);
-
-    const maxX =
-      getSceneX(0);
-
-    targetX =
-      clamp(
-        targetX + deltaX,
-        minX,
-        maxX
-      );
-
-    track.style.transform =
-      `translate3d(${targetX}px, 0, 0)`;
-  };
-
-
-  const handlePointerUp = (event) => {
-
-    if (!pointerDown) {
-      return;
-    }
-
-    pointerDown = false;
-
-    experience.classList.remove(
-      "is-dragging"
-    );
-
-    const totalX =
-      event.clientX -
-      pointerStartX;
-
-    const totalY =
-      event.clientY -
-      pointerStartY;
-
-    const elapsed =
-      performance.now() -
-      touchStartTime;
-
-    const horizontal =
-      Math.abs(totalX) >
-      Math.abs(totalY);
-
-    /*
-      Если пользователь сделал короткий
-      клик мышью, ничего не переключаем.
-    */
-
-    if (
-      !pointerMoved &&
-      event.pointerType === "mouse"
-    ) {
-      goToScene(
-        currentIndex,
-        {
-          updateUrl: false
-        }
-      );
-
-      return;
-    }
-
-    /*
-      Свайп:
-      достаточно 55 px.
-      Быстрый свайп допускается от 35 px.
-    */
-
-    const threshold =
-      elapsed < 350
-        ? 35
-        : 55;
-
-    if (
-      horizontal &&
-      Math.abs(totalX) >= threshold
-    ) {
-
-      if (totalX < 0) {
-        nextScene();
+      if (deltaX < 0) {
+        goTo(currentIndex + 1);
       } else {
-        previousScene();
+        goTo(currentIndex - 1);
       }
-
-      return;
+    } else {
+      goTo(currentIndex, { force: true });
     }
+  },
+  { passive: true }
+);
 
-    /*
-      Если жест был недостаточным,
-      возвращаемся к ближайшей сцене.
-    */
+/* -----------------------------------
+   KEYBOARD
+----------------------------------- */
 
-    const estimatedIndex =
-      Math.round(
-        Math.abs(
-          targetX / viewportWidth
-        )
-      );
-
-    goToScene(
-      estimatedIndex,
-      {
-        updateUrl: false
-      }
-    );
-  };
-
-
-  /* =======================================================
-     TOUCH SAFETY
-  ======================================================== */
-
-  const handleTouchStart = (event) => {
-
-    if (!event.touches.length) {
-      return;
-    }
-
-    pointerStartX =
-      event.touches[0].clientX;
-
-    pointerStartY =
-      event.touches[0].clientY;
-  };
-
-
-  /* =======================================================
-     KEYBOARD
-  ======================================================== */
-
-  const handleKeyboard = (event) => {
-
-    if (
-      event.key === "ArrowRight" ||
-      event.key === "ArrowDown"
-    ) {
-
-      event.preventDefault();
-
-      nextScene();
-
-      return;
-    }
-
-    if (
-      event.key === "ArrowLeft" ||
-      event.key === "ArrowUp"
-    ) {
-
-      event.preventDefault();
-
-      previousScene();
-
-      return;
-    }
-
-    if (event.key === "Home") {
-
-      event.preventDefault();
-
-      goToScene(0);
-
-      return;
-    }
-
-    if (event.key === "End") {
-
-      event.preventDefault();
-
-      goToScene(TOTAL - 1);
-
-    }
-  };
-
-
-  /* =======================================================
-     RESIZE
-  ======================================================== */
-
-  const handleResize = () => {
-
-    viewportWidth =
-      window.innerWidth;
-
-    targetX =
-      getSceneX(
-        currentIndex
-      );
-
-    currentX =
-      targetX;
-
-    track.style.transform =
-      `translate3d(${currentX}px, 0, 0)`;
-  };
-
-
-  /* =======================================================
-     MOBILE MENU
-  ======================================================== */
-
-  const openMenu = () => {
-
-    mobileMenu.classList.add(
-      "is-open"
-    );
-
-    mobileMenu.setAttribute(
-      "aria-hidden",
-      "false"
-    );
-
-    menuButton.setAttribute(
-      "aria-expanded",
-      "true"
-    );
-  };
-
-
-  const closeMenu = () => {
-
-    mobileMenu.classList.remove(
-      "is-open"
-    );
-
-    mobileMenu.setAttribute(
-      "aria-hidden",
-      "true"
-    );
-
-    menuButton.setAttribute(
-      "aria-expanded",
-      "false"
-    );
-  };
-
-
-  /* =======================================================
-     MENU NAVIGATION
-  ======================================================== */
-
-  const handleMenuNavigation = (
-    event
-  ) => {
-
+window.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowRight") {
     event.preventDefault();
+    goTo(currentIndex + 1);
+  }
 
-    const index =
-      Number(
-        event.currentTarget.dataset.menuScene
-      );
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    goTo(currentIndex - 1);
+  }
 
+  if (event.key === "Home") {
+    event.preventDefault();
+    goTo(0);
+  }
+
+  if (event.key === "End") {
+    event.preventDefault();
+    goTo(TOTAL_SCENES - 1);
+  }
+
+  if (event.key === "Escape") {
     closeMenu();
+  }
+});
 
-    setTimeout(() => {
+/* -----------------------------------
+   CTA
+----------------------------------- */
 
-      goToScene(index);
+function openVK() {
+  window.location.href = VK_URL;
+}
 
-    }, 120);
-  };
+headerCta.addEventListener("click", openVK);
+finalCta.addEventListener("click", openVK);
+mobileCta.addEventListener("click", openVK);
 
+/* -----------------------------------
+   MOBILE MENU
+----------------------------------- */
 
-  /* =======================================================
-     HASH CHANGE
-  ======================================================== */
+function closeMenu() {
+  mobileMenu.classList.remove("open");
+  menuButton.classList.remove("open");
+}
 
-  const handleHashChange = () => {
+function toggleMenu() {
+  mobileMenu.classList.toggle("open");
+  menuButton.classList.toggle("open");
+}
 
-    const index =
-      readHash();
+menuButton.addEventListener("click", toggleMenu);
 
-    goToScene(
-      index,
-      {
-        updateUrl: false,
-        instant: false
-      }
-    );
-  };
+document.querySelectorAll("[data-go]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const index = Number(button.dataset.go);
+    goTo(index);
+  });
+});
 
+/* -----------------------------------
+   BRAND
+----------------------------------- */
 
-  /* =======================================================
-     HOVER PARALLAX
-  ======================================================== */
+document.querySelector(".brand").addEventListener("click", (event) => {
+  event.preventDefault();
+  goTo(0);
+});
 
-  const setupParallax = () => {
+/* -----------------------------------
+   HASH
+----------------------------------- */
 
-    if (isMobile()) {
+function readHash() {
+  const hash = window.location.hash.replace("#", "");
+
+  if (!hash) {
+    return 0;
+  }
+
+  const number = Number(hash);
+
+  if (
+    Number.isInteger(number) &&
+    number >= 1 &&
+    number <= TOTAL_SCENES
+  ) {
+    return number - 1;
+  }
+
+  return 0;
+}
+
+/* -----------------------------------
+   RESIZE
+----------------------------------- */
+
+function handleResize() {
+  track.style.transition = "none";
+
+  track.style.transform =
+    `translate3d(${-currentIndex * 100}vw,0,0)`;
+
+  requestAnimationFrame(() => {
+    track.style.transition =
+      `transform ${MOVE_DURATION}ms cubic-bezier(.16,1,.3,1)`;
+  });
+}
+
+window.addEventListener("resize", handleResize);
+
+/* -----------------------------------
+   PARALLAX
+----------------------------------- */
+
+window.addEventListener(
+  "pointermove",
+  (event) => {
+    if (window.innerWidth < 900) {
       return;
     }
 
-    scenes.forEach((scene) => {
-
-      const image =
-        scene.querySelector(
-          ".scene-image"
-        );
-
-      if (!image) {
-        return;
-      }
-
-      scene.addEventListener(
-        "pointermove",
-        (event) => {
-
-          if (
-            pointerDown ||
-            !scene.classList.contains("is-active")
-          ) {
-            return;
-          }
-
-          const rect =
-            scene.getBoundingClientRect();
-
-          const x =
-            (event.clientX - rect.left)
-            / rect.width
-            - .5;
-
-          const y =
-            (event.clientY - rect.top)
-            / rect.height
-            - .5;
-
-          image.style.transform =
-            `scale(1.015)
-             translate3d(
-               ${x * -8}px,
-               ${y * -5}px,
-               0
-             )`;
-        }
-      );
-
-      scene.addEventListener(
-        "pointerleave",
-        () => {
-
-          image.style.transform =
-            "";
-
-        }
-      );
-
-    });
-  };
-
-
-  /* =======================================================
-     EVENT LISTENERS
-  ======================================================== */
-
-  experience.addEventListener(
-    "wheel",
-    handleWheel,
-    {
-      passive: false
+    if (pointerDown || isMoving) {
+      return;
     }
-  );
 
-  experience.addEventListener(
-    "pointerdown",
-    handlePointerDown
-  );
+    const x = event.clientX / window.innerWidth - .5;
+    const y = event.clientY / window.innerHeight - .5;
 
-  experience.addEventListener(
-    "pointermove",
-    handlePointerMove
-  );
+    const activeMedia =
+      scenes[currentIndex]?.querySelector(".media-frame");
 
-  experience.addEventListener(
-    "pointerup",
-    handlePointerUp
-  );
-
-  experience.addEventListener(
-    "pointercancel",
-    handlePointerUp
-  );
-
-  experience.addEventListener(
-    "touchstart",
-    handleTouchStart,
-    {
-      passive: true
+    if (!activeMedia) {
+      return;
     }
-  );
 
-  window.addEventListener(
-    "keydown",
-    handleKeyboard
-  );
+    const amountX = x * 8;
+    const amountY = y * 5;
 
-  window.addEventListener(
-    "resize",
-    handleResize
-  );
-
-  window.addEventListener(
-    "hashchange",
-    handleHashChange
-  );
-
-
-  if (menuButton) {
-
-    menuButton.addEventListener(
-      "click",
-      openMenu
-    );
-
+    activeMedia.style.transform =
+      `translate3d(${amountX}px,${amountY}px,0)`;
   }
+);
 
+window.addEventListener("pointerleave", () => {
+  scenes.forEach((scene) => {
+    const media = scene.querySelector(".media-frame");
 
-  if (menuClose) {
-
-    menuClose.addEventListener(
-      "click",
-      closeMenu
-    );
-
-  }
-
-
-  menuLinks.forEach(
-    (link) => {
-
-      link.addEventListener(
-        "click",
-        handleMenuNavigation
-      );
-
+    if (media) {
+      media.style.transform = "";
     }
-  );
+  });
+});
 
+/* -----------------------------------
+   INITIALIZATION
+----------------------------------- */
 
-  /* =======================================================
-     INITIALIZATION
-  ======================================================== */
+const initialScene = readHash();
 
-  const init = () => {
+track.style.transform =
+  `translate3d(${-initialScene * 100}vw,0,0)`;
 
-    viewportWidth =
-      window.innerWidth;
+currentIndex = initialScene;
 
-    const initialIndex =
-      readHash();
+updateInterface(currentIndex);
 
-    currentIndex =
-      initialIndex;
+window.setTimeout(() => {
+  activateScene(currentIndex);
+}, 100);
 
-    targetIndex =
-      initialIndex;
-
-    currentX =
-      getSceneX(initialIndex);
-
-    targetX =
-      currentX;
-
-    track.style.transform =
-      `translate3d(${currentX}px, 0, 0)`;
-
-    setActiveScene(
-      initialIndex
-    );
-
-    updateDateTime();
-
-    setInterval(
-      updateDateTime,
-      1000
-    );
-
-    setupParallax();
-
-    render();
-
-    runLoader();
-
-    initialized = true;
-  };
-
-
-  init();
-
-})();
+runLoader();
