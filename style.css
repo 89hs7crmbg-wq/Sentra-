@@ -1,1058 +1,1937 @@
-/* =====================================================
-   SENTRA
-   Digital Control Experience
-===================================================== */
+:root {
+  --black: #080808;
+  --black-soft: #0d0d0d;
+  --graphite: #141414;
+  --graphite-light: #202020;
+  --white: #f2f0ea;
+  --white-soft: #a7a49c;
+  --gold: #c7a86a;
+  --gold-bright: #e0c17c;
+  --line: rgba(242, 240, 234, 0.14);
+  --line-soft: rgba(242, 240, 234, 0.07);
+  --danger: #c8a86c;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+}
 
-const loader = document.getElementById("loader");
-const loaderProgress = document.getElementById("loaderProgress");
-const loaderPercent = document.getElementById("loaderPercent");
-const loaderChecks = [...document.querySelectorAll(".loader-check")];
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-const site = document.getElementById("site");
-const track = document.getElementById("track");
-const experience = document.getElementById("experience");
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--black);
+}
 
-const scenes = [...document.querySelectorAll(".scene")];
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  background: var(--black);
+  color: var(--white);
+  font-family:
+    Inter,
+    "Helvetica Neue",
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 
-const progressCurrent = document.getElementById("progressCurrent");
-const progressFill = document.getElementById("progressFill");
-const progressLabel = document.getElementById("progressLabel");
-const experienceHint = document.getElementById("experienceHint");
+button,
+a {
+  font: inherit;
+}
 
-const menuButton = document.getElementById("menuButton");
-const mobileMenu = document.getElementById("mobileMenu");
+button {
+  border: 0;
+  background: none;
+  color: inherit;
+}
 
-const currentDate = document.getElementById("currentDate");
-const currentTime = document.getElementById("currentTime");
+a {
+  color: inherit;
+  text-decoration: none;
+}
 
-const controlNetwork = document.getElementById("controlNetwork");
-const centralControl = document.getElementById("centralControl");
-const controlEventLog = document.getElementById("controlEventLog");
-
-const networkLines = {
-  topLeft: document.getElementById("lineTopLeft"),
-  topRight: document.getElementById("lineTopRight"),
-  bottomLeft: document.getElementById("lineBottomLeft"),
-  bottomRight: document.getElementById("lineBottomRight")
-};
-
-const networkPulses = {
-  topLeft: document.getElementById("pulseTopLeft"),
-  topRight: document.getElementById("pulseTopRight"),
-  bottomLeft: document.getElementById("pulseBottomLeft"),
-  bottomRight: document.getElementById("pulseBottomRight")
-};
-
-const progressLabels = [
-  "ОБЪЕКТ",
-  "НАБЛЮДЕНИЕ",
-  "ОБНАРУЖЕНИЕ",
-  "ДОСТУП",
-  "ОПАСНОСТЬ",
-  "ОБСЛУЖИВАНИЕ",
-  "ЦЕНТР КОНТРОЛЯ",
-  "КОНТАКТ"
-];
-
-let currentIndex = 0;
-let isMoving = false;
-
-let pointerStartX = 0;
-let pointerCurrentX = 0;
-let isDragging = false;
-let dragDistance = 0;
-
-let wheelAccumulator = 0;
-let wheelLocked = false;
-
-let controlSequenceTimer = null;
+img {
+  display: block;
+  max-width: 100%;
+}
 
 
-/* =====================================================
+/* =========================================================
    LOADER
-===================================================== */
+========================================================= */
 
-function runLoader() {
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(199, 168, 106, .06),
+      transparent 38%
+    ),
+    #070707;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity .8s var(--ease),
+    visibility .8s var(--ease);
+}
 
-  let progress = 0;
-  let checkIndex = 0;
+.loader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 
-  const checkDuration = 720;
-  const totalDuration = 4100;
-
-  const start = performance.now();
-
-  function finishCheck(index) {
-
-    const item = loaderChecks[index];
-
-    if (!item) {
-      return;
-    }
-
-    item.classList.remove("active");
-    item.classList.add("done");
-
-    const state = item.querySelector(".check-state");
-
-    if (state) {
-      state.textContent = "OK";
-    }
-
-    const next = loaderChecks[index + 1];
-
-    if (next) {
-      next.classList.add("active");
-
-      const nextState = next.querySelector(".check-state");
-
-      if (nextState) {
-        nextState.textContent = "...";
-      }
-    }
-  }
-
-  const checkTimer = setInterval(() => {
-
-    if (checkIndex < loaderChecks.length) {
-      finishCheck(checkIndex);
-      checkIndex++;
-    } else {
-      clearInterval(checkTimer);
-    }
-
-  }, checkDuration);
-
-  function animateLoader(now) {
-
-    const elapsed = now - start;
-
-    progress = Math.min(
-      100,
-      Math.round((elapsed / totalDuration) * 100)
+.loader-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .25;
+  background-image:
+    linear-gradient(
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
     );
-
-    loaderProgress.style.width = `${progress}%`;
-    loaderPercent.textContent = `${progress}%`;
-
-    if (elapsed < totalDuration) {
-      requestAnimationFrame(animateLoader);
-    } else {
-
-      loaderChecks.forEach((item) => {
-        item.classList.remove("active");
-        item.classList.add("done");
-
-        const state = item.querySelector(".check-state");
-
-        if (state) {
-          state.textContent = "OK";
-        }
-      });
-
-      setTimeout(() => {
-
-        loader.classList.add("hidden");
-
-        setTimeout(() => {
-          site.classList.add("ready");
-          activateScene(0);
-        }, 250);
-
-      }, 500);
-    }
-  }
-
-  requestAnimationFrame(animateLoader);
-}
-
-runLoader();
-
-
-/* =====================================================
-   REAL DATE / TIME
-===================================================== */
-
-function updateClock() {
-
-  const now = new Date();
-
-  const dateFormatter = new Intl.DateTimeFormat(
-    "ru-RU",
-    {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    }
-  );
-
-  const timeFormatter = new Intl.DateTimeFormat(
-    "ru-RU",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false
-    }
-  );
-
-  currentDate.textContent = dateFormatter.format(now);
-  currentTime.textContent = timeFormatter.format(now);
-}
-
-updateClock();
-setInterval(updateClock, 1000);
-
-
-/* =====================================================
-   SCENE NAVIGATION
-===================================================== */
-
-function goTo(index, options = {}) {
-
-  const {
-    force = false,
-    instant = false
-  } = options;
-
-  if (isMoving && !force) {
-    return;
-  }
-
-  const maxIndex = scenes.length - 1;
-
-  index = Math.max(
-    0,
-    Math.min(index, maxIndex)
-  );
-
-  if (index === currentIndex && !force) {
-    return;
-  }
-
-  currentIndex = index;
-
-  if (instant) {
-    track.style.transition = "none";
-  } else {
-    track.style.transition =
-      "transform .95s cubic-bezier(.22,.61,.36,1)";
-  }
-
-  track.style.transform =
-    `translate3d(-${index * 100}vw, 0, 0)`;
-
-  activateScene(index);
-  updateProgress(index);
-
-  isMoving = true;
-
-  setTimeout(() => {
-    isMoving = false;
-  }, instant ? 20 : 980);
-
-  if (mobileMenu.classList.contains("open")) {
-    closeMenu();
-  }
-
-  if (history.replaceState) {
-    history.replaceState(
-      null,
-      "",
-      `#scene-${index + 1}`
+  background-size: 72px 72px;
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      black 20%,
+      black 80%,
+      transparent
     );
+}
+
+.loader-glow {
+  position: absolute;
+  width: 48vw;
+  height: 48vw;
+  max-width: 600px;
+  max-height: 600px;
+  border-radius: 50%;
+  background: rgba(199, 168, 106, .04);
+  filter: blur(80px);
+  animation: loaderGlow 4s ease-in-out infinite;
+}
+
+.loader-content {
+  position: relative;
+  z-index: 2;
+  width: min(680px, calc(100% - 48px));
+}
+
+.loader-author {
+  width: 110px;
+  height: 34px;
+  margin-bottom: 32px;
+  overflow: hidden;
+  opacity: .9;
+}
+
+.loader-author img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left center;
+  mix-blend-mode: screen;
+}
+
+.loader-brand {
+  font-size: clamp(52px, 8vw, 100px);
+  line-height: .85;
+  font-weight: 600;
+  letter-spacing: -.07em;
+  margin-bottom: 70px;
+}
+
+.loader-system {
+  width: 100%;
+}
+
+.loader-system-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+
+.loader-progress {
+  width: 100%;
+  height: 2px;
+  background: rgba(255,255,255,.1);
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+
+.loader-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--gold);
+  box-shadow: 0 0 18px rgba(199,168,106,.45);
+}
+
+.loader-checks {
+  display: flex;
+  flex-direction: column;
+}
+
+.loader-check {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line-soft);
+  color: rgba(242,240,234,.38);
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .08em;
+  transition:
+    color .35s ease,
+    border-color .35s ease;
+}
+
+.loader-check strong {
+  min-width: 62px;
+  text-align: right;
+  color: rgba(242,240,234,.28);
+  font-weight: 400;
+}
+
+.loader-check.is-active {
+  color: var(--white);
+  border-color: rgba(199,168,106,.35);
+}
+
+.loader-check.is-active strong {
+  color: var(--gold);
+}
+
+.loader-check.is-done strong {
+  color: var(--gold);
+}
+
+.loader-final {
+  margin-top: 28px;
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .16em;
+  color: var(--gold);
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity .5s ease,
+    transform .5s var(--ease);
+}
+
+.loader-final.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes loaderGlow {
+  0%, 100% {
+    transform: scale(.95);
+    opacity: .6;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
   }
 }
 
 
-/* =====================================================
-   SCENE ACTIVATION
-===================================================== */
+/* =========================================================
+   SITE
+========================================================= */
 
-function activateScene(index) {
+.site {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--black);
+}
 
-  scenes.forEach((scene, sceneIndex) => {
 
-    scene.classList.toggle(
-      "active",
-      sceneIndex === index
+/* =========================================================
+   HEADER
+========================================================= */
+
+.header {
+  position: fixed;
+  z-index: 500;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 82px;
+  padding:
+    env(safe-area-inset-top)
+    28px
+    0
+    28px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(8,8,8,.92),
+      rgba(8,8,8,.62),
+      transparent
     );
+  pointer-events: none;
+}
 
-  });
+.header > * {
+  pointer-events: auto;
+}
 
-  if (index === 6) {
-    startControlCenterSequence();
-  } else {
-    stopControlCenterSequence();
+.header-brand {
+  justify-self: start;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+.header-order {
+  position: relative;
+  justify-self: center;
+  padding: 10px 17px;
+  border: 1px solid rgba(199,168,106,.45);
+  color: var(--white);
+  font-size: 10px;
+  letter-spacing: .11em;
+  transition:
+    color .3s ease,
+    background .3s ease,
+    border-color .3s ease,
+    transform .3s var(--ease);
+}
+
+.header-order::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .45s var(--ease);
+  z-index: -1;
+}
+
+.header-order:hover {
+  color: #080808;
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.header-order:hover::before {
+  transform: scaleX(1);
+}
+
+.header-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 25px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+
+.header-status i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 12px rgba(199,168,106,.7);
+  animation: statusPulse 1.8s ease-in-out infinite;
+}
+
+.header-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-family: "Courier New", monospace;
+}
+
+.header-time span {
+  color: var(--white-soft);
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.header-time strong {
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: .06em;
+}
+
+.menu-button {
+  display: none;
+  width: 32px;
+  height: 32px;
+  position: relative;
+  cursor: pointer;
+}
+
+.menu-button span {
+  position: absolute;
+  left: 5px;
+  width: 22px;
+  height: 1px;
+  background: var(--white);
+  transition: transform .35s var(--ease);
+}
+
+.menu-button span:first-child {
+  top: 12px;
+}
+
+.menu-button span:last-child {
+  top: 19px;
+}
+
+.menu-button.is-open span:first-child {
+  transform: translateY(3.5px) rotate(45deg);
+}
+
+.menu-button.is-open span:last-child {
+  transform: translateY(-3.5px) rotate(-45deg);
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: .45;
+    transform: scale(.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
   }
 }
 
 
-/* =====================================================
-   PROGRESS
-===================================================== */
-
-function updateProgress(index) {
-
-  progressCurrent.textContent =
-    String(index + 1).padStart(2, "0");
-
-  progressFill.style.width =
-    `${((index + 1) / scenes.length) * 100}%`;
-
-  progressLabel.textContent =
-    progressLabels[index];
-
-  if (index > 0) {
-    experienceHint.classList.add("hidden");
-  } else {
-    experienceHint.classList.remove("hidden");
-  }
-}
-
-
-/* =====================================================
-   WHEEL
-===================================================== */
-
-experience.addEventListener(
-  "wheel",
-  (event) => {
-
-    event.preventDefault();
-
-    if (wheelLocked || isMoving) {
-      return;
-    }
-
-    wheelAccumulator += event.deltaY;
-
-    const threshold = 55;
-
-    if (Math.abs(wheelAccumulator) < threshold) {
-      return;
-    }
-
-    const direction =
-      wheelAccumulator > 0 ? 1 : -1;
-
-    wheelAccumulator = 0;
-    wheelLocked = true;
-
-    goTo(currentIndex + direction);
-
-    setTimeout(() => {
-      wheelLocked = false;
-    }, 850);
-
-  },
-  { passive: false }
-);
-
-
-/* =====================================================
-   POINTER DRAG
-===================================================== */
-
-experience.addEventListener(
-  "pointerdown",
-  (event) => {
-
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    pointerStartX = event.clientX;
-    pointerCurrentX = event.clientX;
-    dragDistance = 0;
-    isDragging = true;
-
-    track.classList.add("dragging");
-
-    try {
-      experience.setPointerCapture(event.pointerId);
-    } catch (error) {
-      // Не критично.
-    }
-
-  }
-);
-
-
-experience.addEventListener(
-  "pointermove",
-  (event) => {
-
-    if (!isDragging) {
-      return;
-    }
-
-    pointerCurrentX = event.clientX;
-
-    dragDistance =
-      pointerCurrentX - pointerStartX;
-
-    const baseOffset =
-      currentIndex * window.innerWidth;
-
-    const resistance = 0.58;
-
-    const dragOffset =
-      dragDistance * resistance;
-
-    track.style.transform =
-      `translate3d(${-(baseOffset) + dragOffset}px, 0, 0)`;
-
-  }
-);
-
-
-experience.addEventListener(
-  "pointerup",
-  (event) => {
-
-    if (!isDragging) {
-      return;
-    }
-
-    isDragging = false;
-
-    track.classList.remove("dragging");
-
-    try {
-      experience.releasePointerCapture(event.pointerId);
-    } catch (error) {
-      // Не критично.
-    }
-
-    const threshold =
-      Math.min(
-        120,
-        Math.max(
-          65,
-          window.innerWidth * 0.13
-        )
-      );
-
-    if (Math.abs(dragDistance) >= threshold) {
-
-      if (dragDistance < 0) {
-        goTo(currentIndex + 1, { force: true });
-      } else {
-        goTo(currentIndex - 1, { force: true });
-      }
-
-    } else {
-
-      goTo(currentIndex, {
-        force: true
-      });
-
-    }
-
-  }
-);
-
-
-experience.addEventListener(
-  "pointercancel",
-  () => {
-
-    if (!isDragging) {
-      return;
-    }
-
-    isDragging = false;
-
-    track.classList.remove("dragging");
-
-    goTo(currentIndex, {
-      force: true
-    });
-
-  }
-);
-
-
-/* =====================================================
-   KEYBOARD
-===================================================== */
-
-document.addEventListener(
-  "keydown",
-  (event) => {
-
-    if (
-      event.key === "ArrowRight" ||
-      event.key === "ArrowDown"
-    ) {
-      event.preventDefault();
-      goTo(currentIndex + 1);
-    }
-
-    if (
-      event.key === "ArrowLeft" ||
-      event.key === "ArrowUp"
-    ) {
-      event.preventDefault();
-      goTo(currentIndex - 1);
-    }
-
-    if (event.key === "Home") {
-      event.preventDefault();
-      goTo(0);
-    }
-
-    if (event.key === "End") {
-      event.preventDefault();
-      goTo(scenes.length - 1);
-    }
-
-    if (event.key === "Escape") {
-      closeMenu();
-    }
-
-  }
-);
-
-
-/* =====================================================
+/* =========================================================
    MOBILE MENU
-===================================================== */
+========================================================= */
 
-function openMenu() {
-
-  mobileMenu.classList.add("open");
-  menuButton.classList.add("active");
-
+.mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      rgba(199,168,106,.05),
+      transparent 45%
+    ),
+    #080808;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity .4s ease,
+    visibility .4s ease;
 }
 
-function closeMenu() {
-
-  mobileMenu.classList.remove("open");
-  menuButton.classList.remove("active");
-
+.mobile-menu.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
-menuButton.addEventListener(
-  "click",
-  () => {
+.mobile-menu-inner {
+  width: 100%;
+  height: 100%;
+  padding:
+    120px
+    28px
+    40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
 
-    if (mobileMenu.classList.contains("open")) {
-      closeMenu();
-    } else {
-      openMenu();
-    }
+.mobile-menu-label {
+  margin-bottom: 28px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: .14em;
+}
 
-  }
-);
+.mobile-menu button,
+.mobile-menu a {
+  padding: 9px 0;
+  color: var(--white);
+  font-size: 23px;
+  letter-spacing: -.04em;
+}
+
+.mobile-menu a {
+  margin-top: 25px;
+  color: var(--gold);
+  font-size: 11px;
+  letter-spacing: .1em;
+}
 
 
-document
-  .querySelectorAll("[data-menu-scene]")
-  .forEach((button) => {
+/* =========================================================
+   EXPERIENCE / TRACK
+========================================================= */
 
-    button.addEventListener(
-      "click",
-      () => {
+.experience {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 
-        const index =
-          Number(button.dataset.menuScene);
+.track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  width: 800vw;
+  height: 100%;
+  will-change: transform;
+  transform: translate3d(0,0,0);
+}
 
-        goTo(index, {
-          force: true
-        });
+.track.is-dragging {
+  transition: none !important;
+}
 
-        closeMenu();
+.scene {
+  position: relative;
+  flex: 0 0 100vw;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse at 50% 35%,
+      rgba(255,255,255,.025),
+      transparent 52%
+    ),
+    var(--black);
+}
 
-      }
+.scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255,255,255,.018),
+      transparent
     );
+  opacity: .55;
+}
 
-  });
+.scene-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding:
+    100px
+    34px
+    54px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scene-copy {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
+  max-width: 900px;
+  padding-bottom: 18px;
+}
+
+.scene-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 17px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.scene h1,
+.scene h2 {
+  max-width: 1000px;
+  color: var(--white);
+  font-size: clamp(42px, 7.1vw, 104px);
+  line-height: .87;
+  font-weight: 600;
+  letter-spacing: -.075em;
+  text-transform: uppercase;
+}
+
+.scene p {
+  max-width: 560px;
+  margin-top: 20px;
+  color: var(--white-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -.015em;
+}
+
+.media-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  background: #111;
+  border: 1px solid rgba(242,240,234,.08);
+}
+
+.media-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
+  filter:
+    saturate(.78)
+    contrast(1.04)
+    brightness(.82);
+  transform: scale(1.015);
+  transition:
+    transform 1.6s var(--ease),
+    filter 1.2s ease;
+}
+
+.scene.is-active .media-frame img {
+  transform: scale(1);
+  filter:
+    saturate(.88)
+    contrast(1.04)
+    brightness(.88);
+}
+
+.media-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0,0,0,.18),
+      transparent 38%,
+      rgba(0,0,0,.42)
+    );
+  pointer-events: none;
+}
+
+.media-label {
+  position: absolute;
+  z-index: 8;
+  padding: 7px 9px;
+  border: 1px solid rgba(242,240,234,.18);
+  background: rgba(7,7,7,.35);
+  backdrop-filter: blur(8px);
+  color: rgba(242,240,234,.85);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.media-label.top-left {
+  top: 16px;
+  left: 16px;
+}
+
+.media-label.bottom-right {
+  right: 16px;
+  bottom: 16px;
+}
+
+.access-ok {
+  color: var(--gold-bright);
+  border-color: rgba(199,168,106,.4);
+}
+
+.alert-label {
+  color: var(--gold-bright);
+  border-color: rgba(199,168,106,.45);
+}
+
+.scan-line {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: -5%;
+  height: 1px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(199,168,106,.9),
+      transparent
+    );
+  box-shadow: 0 0 20px rgba(199,168,106,.45);
+  opacity: 0;
+}
+
+.scene.is-active .scan-line {
+  animation: scan 3.8s ease-in-out infinite;
+}
+
+@keyframes scan {
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: .7;
+  }
+  50% {
+    opacity: .85;
+  }
+  90% {
+    opacity: .25;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
 
 
-/* =====================================================
+/* =========================================================
+   CORNERS
+========================================================= */
+
+.corner {
+  position: absolute;
+  z-index: 7;
+  width: 25px;
+  height: 25px;
+  border-color: rgba(242,240,234,.45);
+  opacity: .35;
+  transition:
+    width .8s var(--ease),
+    height .8s var(--ease),
+    opacity .8s ease,
+    border-color .8s ease;
+}
+
+.corner-tl {
+  top: 12px;
+  left: 12px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+
+.corner-tr {
+  top: 12px;
+  right: 12px;
+  border-top: 1px solid;
+  border-right: 1px solid;
+}
+
+.corner-bl {
+  bottom: 12px;
+  left: 12px;
+  border-bottom: 1px solid;
+  border-left: 1px solid;
+}
+
+.corner-br {
+  bottom: 12px;
+  right: 12px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+.scene.is-active .corner {
+  width: 38px;
+  height: 38px;
+  opacity: .75;
+  border-color: rgba(199,168,106,.6);
+}
+
+
+/* =========================================================
+   DETECTION
+========================================================= */
+
+.detection-frame {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: 110px;
+  height: 130px;
+  border: 1px solid rgba(199,168,106,.6);
+  transform: translate(-50%,-50%) scale(.7);
+  opacity: 0;
+}
+
+.detection-frame::before,
+.detection-frame::after {
+  content: "";
+  position: absolute;
+  width: 15px;
+  height: 15px;
+}
+
+.detection-frame::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--gold);
+  border-left: 2px solid var(--gold);
+}
+
+.detection-frame::after {
+  right: -1px;
+  bottom: -1px;
+  border-right: 2px solid var(--gold);
+  border-bottom: 2px solid var(--gold);
+}
+
+.detection-frame span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 48%;
+  height: 1px;
+  background: var(--gold);
+  box-shadow: 0 0 15px rgba(199,168,106,.7);
+}
+
+.scene.is-active .detection-frame {
+  animation: detectionFrame 3.2s var(--ease) infinite;
+}
+
+.detection-line {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  bottom: 0;
+  left: 20%;
+  width: 1px;
+  background: linear-gradient(
+    transparent,
+    rgba(199,168,106,.65),
+    transparent
+  );
+  opacity: 0;
+}
+
+.scene.is-active .detection-line {
+  animation: detectionLine 3.8s ease-in-out infinite;
+}
+
+@keyframes detectionFrame {
+  0%, 100% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(.7);
+  }
+  20% {
+    opacity: .8;
+    transform: translate(-50%,-50%) scale(1);
+  }
+  60% {
+    opacity: .8;
+    transform: translate(-50%,-50%) scale(1.04);
+  }
+  80% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(1.12);
+  }
+}
+
+@keyframes detectionLine {
+  0% {
+    left: 10%;
+    opacity: 0;
+  }
+  15% {
+    opacity: .5;
+  }
+  70% {
+    opacity: .4;
+  }
+  100% {
+    left: 90%;
+    opacity: 0;
+  }
+}
+
+
+/* =========================================================
+   CAMERA
+========================================================= */
+
+.camera-pulse {
+  position: absolute;
+  z-index: 5;
+  top: 16%;
+  right: 18%;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.camera-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -15px;
+  border: 1px solid rgba(199,168,106,.35);
+  border-radius: 50%;
+}
+
+.scene.is-active .camera-pulse {
+  animation: cameraPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes cameraPulse {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(.7);
+  }
+  30% {
+    opacity: 1;
+  }
+  60% {
+    opacity: .8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+
+/* =========================================================
+   ACCESS
+========================================================= */
+
+.access-wave {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  width: 70px;
+  height: 70px;
+  border: 1px solid rgba(199,168,106,.75);
+  border-radius: 50%;
+  transform: translate(-50%,-50%) scale(.4);
+  opacity: 0;
+}
+
+.access-wave-two {
+  animation-delay: 1s !important;
+}
+
+.scene.is-active .access-wave {
+  animation: accessWave 2.6s ease-out infinite;
+}
+
+@keyframes accessWave {
+  0% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(.3);
+  }
+  20% {
+    opacity: .8;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(3.8);
+  }
+}
+
+
+/* =========================================================
+   ALERT
+========================================================= */
+
+.alert-ring {
+  position: absolute;
+  z-index: 5;
+  width: min(30vw, 260px);
+  aspect-ratio: 1;
+  left: 50%;
+  top: 50%;
+  border: 1px solid rgba(199,168,106,.7);
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  opacity: 0;
+}
+
+.scene.is-active .alert-ring {
+  animation: alertRing 2.4s ease-out infinite;
+}
+
+.alert-line {
+  position: absolute;
+  z-index: 5;
+  inset: 10%;
+  border: 1px solid rgba(199,168,106,.35);
+  opacity: 0;
+}
+
+.scene.is-active .alert-line {
+  animation: alertBorder 2.4s ease-in-out infinite;
+}
+
+@keyframes alertRing {
+  0% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(.5);
+  }
+  20% {
+    opacity: .8;
+  }
+  80% {
+    opacity: .15;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(1.8);
+  }
+}
+
+@keyframes alertBorder {
+  0%, 100% {
+    opacity: .1;
+    inset: 10%;
+  }
+  50% {
+    opacity: .55;
+    inset: 5%;
+  }
+}
+
+
+/* =========================================================
+   MAINTENANCE
+========================================================= */
+
+.maintenance-sweep {
+  position: absolute;
+  z-index: 5;
+  left: -10%;
+  top: 0;
+  width: 25%;
+  height: 100%;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(199,168,106,.08),
+      transparent
+    );
+  transform: skewX(-12deg);
+  opacity: 0;
+}
+
+.scene.is-active .maintenance-sweep {
+  animation: maintenanceSweep 4s ease-in-out infinite;
+}
+
+.maintenance-point {
+  position: absolute;
+  z-index: 6;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.point-one {
+  left: 22%;
+  top: 34%;
+}
+
+.point-two {
+  left: 67%;
+  top: 48%;
+}
+
+.point-three {
+  left: 52%;
+  top: 72%;
+}
+
+.scene.is-active .maintenance-point {
+  animation: maintenancePoint 2.5s ease-in-out infinite;
+}
+
+.point-two {
+  animation-delay: .7s !important;
+}
+
+.point-three {
+  animation-delay: 1.4s !important;
+}
+
+@keyframes maintenanceSweep {
+  0% {
+    left: -20%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  70% {
+    opacity: .7;
+  }
+  100% {
+    left: 110%;
+    opacity: 0;
+  }
+}
+
+@keyframes maintenancePoint {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(.6);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  65% {
+    opacity: .35;
+    transform: scale(1.7);
+  }
+}
+
+
+/* =========================================================
    CONTROL CENTER
-   REAL DOM GEOMETRY
-===================================================== */
+========================================================= */
 
-function updateNetworkGeometry() {
-
-  if (!controlNetwork || !centralControl) {
-    return;
-  }
-
-  const networkRect =
-    controlNetwork.getBoundingClientRect();
-
-  const centerRect =
-    centralControl.getBoundingClientRect();
-
-  const centerX =
-    centerRect.left +
-    centerRect.width / 2 -
-    networkRect.left;
-
-  const centerY =
-    centerRect.top +
-    centerRect.height / 2 -
-    networkRect.top;
-
-  const networkWidth =
-    networkRect.width;
-
-  const networkHeight =
-    networkRect.height;
-
-  const nodes = {
-    topLeft:
-      controlNetwork.querySelector(".node-tl"),
-
-    topRight:
-      controlNetwork.querySelector(".node-tr"),
-
-    bottomLeft:
-      controlNetwork.querySelector(".node-bl"),
-
-    bottomRight:
-      controlNetwork.querySelector(".node-br")
-  };
-
-  const getCenter = (element) => {
-
-    const rect =
-      element.getBoundingClientRect();
-
-    return {
-      x:
-        rect.left +
-        rect.width / 2 -
-        networkRect.left,
-
-      y:
-        rect.top +
-        rect.height / 2 -
-        networkRect.top
-    };
-
-  };
-
-  const points = {
-    topLeft: getCenter(nodes.topLeft),
-    topRight: getCenter(nodes.topRight),
-    bottomLeft: getCenter(nodes.bottomLeft),
-    bottomRight: getCenter(nodes.bottomRight)
-  };
-
-  function toSvg(point) {
-
-    return {
-      x:
-        (point.x / networkWidth) * 1000,
-
-      y:
-        (point.y / networkHeight) * 620
-    };
-
-  }
-
-  const centerSvg = toSvg({
-    x: centerX,
-    y: centerY
-  });
-
-  const tl = toSvg(points.topLeft);
-  const tr = toSvg(points.topRight);
-  const bl = toSvg(points.bottomLeft);
-  const br = toSvg(points.bottomRight);
-
-  setLine(
-    networkLines.topLeft,
-    tl,
-    centerSvg
-  );
-
-  setLine(
-    networkLines.topRight,
-    tr,
-    centerSvg
-  );
-
-  setLine(
-    networkLines.bottomLeft,
-    bl,
-    centerSvg
-  );
-
-  setLine(
-    networkLines.bottomRight,
-    br,
-    centerSvg
-  );
-
-  setPulsePosition(
-    networkPulses.topLeft,
-    tl
-  );
-
-  setPulsePosition(
-    networkPulses.topRight,
-    tr
-  );
-
-  setPulsePosition(
-    networkPulses.bottomLeft,
-    bl
-  );
-
-  setPulsePosition(
-    networkPulses.bottomRight,
-    br
-  );
-
+.control-network {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(242,240,234,.08);
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(199,168,106,.055),
+      transparent 34%
+    ),
+    #0a0a0a;
 }
 
-
-function setLine(
-  line,
-  start,
-  end
-) {
-
-  if (!line) {
-    return;
-  }
-
-  line.setAttribute(
-    "x1",
-    start.x
-  );
-
-  line.setAttribute(
-    "y1",
-    start.y
-  );
-
-  line.setAttribute(
-    "x2",
-    end.x
-  );
-
-  line.setAttribute(
-    "y2",
-    end.y
-  );
-
-}
-
-
-function setPulsePosition(
-  pulse,
-  point
-) {
-
-  if (!pulse) {
-    return;
-  }
-
-  pulse.setAttribute(
-    "cx",
-    point.x
-  );
-
-  pulse.setAttribute(
-    "cy",
-    point.y
-  );
-
-}
-
-
-/* =====================================================
-   CONTROL CENTER SIGNALS
-===================================================== */
-
-function startControlCenterSequence() {
-
-  stopControlCenterSequence();
-
-  updateNetworkGeometry();
-
-  const nodes = [
-    {
-      name: "ВИДЕО",
-      pulse: networkPulses.topLeft
-    },
-    {
-      name: "ДОСТУП",
-      pulse: networkPulses.topRight
-    },
-    {
-      name: "ОПС",
-      pulse: networkPulses.bottomLeft
-    },
-    {
-      name: "СЕРВИС",
-      pulse: networkPulses.bottomRight
-    }
-  ];
-
-  let step = 0;
-
-  const runStep = () => {
-
-    const current = nodes[step];
-
-    if (!current) {
-      step = 0;
-      return;
-    }
-
-    const pulse = current.pulse;
-
-    if (pulse) {
-
-      pulse.animate(
-        [
-          {
-            opacity: 0,
-            r: 3
-          },
-          {
-            opacity: .95,
-            r: 7,
-            offset: .25
-          },
-          {
-            opacity: 0,
-            r: 4
-          }
-        ],
-        {
-          duration: 1200,
-          easing: "cubic-bezier(.22,.61,.36,1)"
-        }
-      );
-
-    }
-
-    controlEventLog.textContent =
-      `${current.name} → ЦЕНТР КОНТРОЛЯ`;
-
-    centralControl.animate(
-      [
-        {
-          filter:
-            "drop-shadow(0 0 0 rgba(199,165,106,0))"
-        },
-        {
-          filter:
-            "drop-shadow(0 0 24px rgba(199,165,106,.65))"
-        },
-        {
-          filter:
-            "drop-shadow(0 0 0 rgba(199,165,106,0))"
-        }
-      ],
-      {
-        duration: 1000,
-        easing: "ease-out"
-      }
+.control-network::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
     );
+  background-size: 48px 48px;
+  opacity: .6;
+}
 
-    setTimeout(() => {
+.network-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
 
-      controlEventLog.textContent =
-        "СИГНАЛ ПРИНЯТ / СИСТЕМА В НОРМЕ";
+.network-lines line {
+  stroke: rgba(199,168,106,.25);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke .5s ease,
+    stroke-width .5s ease;
+}
 
-    }, 720);
+.network-lines circle {
+  fill: var(--gold);
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(199,168,106,.8));
+}
 
-    step++;
+.network-node {
+  position: absolute;
+  z-index: 5;
+  width: 150px;
+  min-height: 80px;
+  padding: 11px;
+  border: 1px solid rgba(242,240,234,.14);
+  background: rgba(10,10,10,.78);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition:
+    border-color .5s ease,
+    transform .6s var(--ease),
+    background .5s ease;
+}
 
-    if (step >= nodes.length) {
-      step = 0;
-    }
+.network-node span {
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  margin-bottom: 7px;
+}
 
-  };
+.network-node strong {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+}
 
-  runStep();
+.network-node small {
+  margin-top: 3px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .06em;
+}
 
-  controlSequenceTimer =
-    setInterval(
-      runStep,
-      1900
+.network-node i {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(242,240,234,.3);
+}
+
+.network-node.is-live {
+  border-color: rgba(199,168,106,.65);
+  background: rgba(199,168,106,.06);
+  transform: translateY(-3px);
+}
+
+.network-node.is-live i {
+  background: var(--gold);
+  box-shadow: 0 0 13px rgba(199,168,106,.7);
+}
+
+.node-one {
+  left: 5%;
+  top: 7%;
+}
+
+.node-two {
+  right: 5%;
+  top: 7%;
+}
+
+.node-three {
+  left: 5%;
+  bottom: 7%;
+}
+
+.node-four {
+  right: 5%;
+  bottom: 7%;
+}
+
+.central-control {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: min(250px, 27vw);
+  aspect-ratio: 1;
+  transform: translate(-50%,-50%);
+  display: grid;
+  place-items: center;
+}
+
+.central-core {
+  position: absolute;
+  width: 28%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow:
+    0 0 22px rgba(199,168,106,.45),
+    0 0 70px rgba(199,168,106,.12);
+}
+
+.central-ring {
+  position: absolute;
+  border: 1px solid rgba(199,168,106,.25);
+  border-radius: 50%;
+}
+
+.ring-one {
+  inset: 13%;
+  animation: centralRing 3.5s linear infinite;
+}
+
+.ring-two {
+  inset: 28%;
+  animation:
+    centralRing 2.6s linear infinite reverse;
+}
+
+.central-text {
+  position: absolute;
+  top: 67%;
+  left: 50%;
+  width: 190px;
+  transform: translateX(-50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.central-text span {
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .14em;
+}
+
+.central-text strong {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+}
+
+.central-text small {
+  margin-top: 5px;
+  color: var(--gold);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .08em;
+}
+
+.network-event {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 7;
+  transform: translateX(-50%);
+  padding: 7px 11px;
+  border: 1px solid rgba(199,168,106,.25);
+  background: rgba(8,8,8,.7);
+  color: var(--gold);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .1em;
+  white-space: nowrap;
+}
+
+@keyframes centralRing {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* =========================================================
+   CONTACT
+========================================================= */
+
+.contact-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(242,240,234,.08);
+  background: #111;
+}
+
+.contact-stage > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter:
+    brightness(.72)
+    contrast(1.05)
+    saturate(.75);
+  transform: scale(1.04);
+  transition: transform 1.5s var(--ease);
+}
+
+.scene.is-active .contact-stage > img {
+  transform: scale(1);
+}
+
+.contact-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0,0,0,.68),
+      rgba(0,0,0,.08) 55%,
+      rgba(0,0,0,.35)
+    ),
+    linear-gradient(
+      0deg,
+      rgba(0,0,0,.62),
+      transparent 55%
     );
 }
 
-
-function stopControlCenterSequence() {
-
-  if (controlSequenceTimer) {
-    clearInterval(controlSequenceTimer);
-    controlSequenceTimer = null;
-  }
-
-}
-
-
-/* =====================================================
-   RESIZE
-===================================================== */
-
-window.addEventListener(
-  "resize",
-  () => {
-
-    track.classList.remove("dragging");
-
-    track.style.transition = "none";
-
-    track.style.transform =
-      `translate3d(-${currentIndex * 100}vw, 0, 0)`;
-
-    requestAnimationFrame(() => {
-
-      track.style.transition =
-        "transform .95s cubic-bezier(.22,.61,.36,1)";
-
-      updateNetworkGeometry();
-
-    });
-
-  }
-);
-
-
-/* =====================================================
-   PARALLAX
-===================================================== */
-
-experience.addEventListener(
-  "pointermove",
-  (event) => {
-
-    if (isDragging) {
-      return;
-    }
-
-    const activeScene =
-      scenes[currentIndex];
-
-    if (!activeScene) {
-      return;
-    }
-
-    const media =
-      activeScene.querySelector(".media-frame");
-
-    if (!media) {
-      return;
-    }
-
-    const rect =
-      activeScene.getBoundingClientRect();
-
-    const x =
-      (event.clientX - rect.left) /
-      rect.width -
-      .5;
-
-    const y =
-      (event.clientY - rect.top) /
-      rect.height -
-      .5;
-
-    const image =
-      media.querySelector("img");
-
-    if (!image) {
-      return;
-    }
-
-    image.style.transform =
-      `scale(1.015) translate(${x * -7}px, ${y * -4}px)`;
-
-  }
-);
-
-
-experience.addEventListener(
-  "pointerleave",
-  () => {
-
-    const activeScene =
-      scenes[currentIndex];
-
-    if (!activeScene) {
-      return;
-    }
-
-    const image =
-      activeScene.querySelector(
-        ".media-frame img"
-      );
-
-    if (!image) {
-      return;
-    }
-
-    image.style.transform =
-      "scale(1) translate(0,0)";
-
-  }
-);
-
-
-/* =====================================================
-   HASH NAVIGATION
-===================================================== */
-
-function readHash() {
-
-  const match =
-    window.location.hash.match(
-      /scene-(\d+)/
+.contact-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .22;
+  background-image:
+    linear-gradient(
+      rgba(255,255,255,.04) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.04) 1px,
+      transparent 1px
     );
+  background-size: 70px 70px;
+}
 
-  if (!match) {
-    return;
+.contact-info {
+  position: absolute;
+  left: 25px;
+  bottom: 24px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+}
+
+.contact-info span {
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  letter-spacing: .1em;
+}
+
+.contact-info strong {
+  margin-top: 8px;
+  font-size: 30px;
+  line-height: .9;
+  letter-spacing: -.06em;
+  font-weight: 600;
+}
+
+.contact-info small {
+  margin-top: 7px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .08em;
+}
+
+.contact-button {
+  position: absolute;
+  z-index: 7;
+  right: 25px;
+  bottom: 25px;
+  padding: 14px 20px;
+  border: 1px solid rgba(199,168,106,.65);
+  background: rgba(8,8,8,.55);
+  backdrop-filter: blur(8px);
+  color: var(--white);
+  font-size: 10px;
+  letter-spacing: .1em;
+  transition:
+    background .35s ease,
+    color .35s ease,
+    transform .35s var(--ease);
+}
+
+.contact-button:hover {
+  background: var(--gold);
+  color: #080808;
+  transform: translateY(-3px);
+}
+
+.fiction-note {
+  flex: 0 0 auto;
+  margin-top: 10px;
+  color: rgba(242,240,234,.35);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .06em;
+}
+
+
+/* =========================================================
+   PROGRESS
+========================================================= */
+
+.scene-progress {
+  position: fixed;
+  z-index: 300;
+  left: 34px;
+  right: 34px;
+  bottom: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--white-soft);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  letter-spacing: .1em;
+  pointer-events: none;
+}
+
+.progress-line {
+  position: relative;
+  flex: 1;
+  height: 1px;
+  background: rgba(242,240,234,.16);
+}
+
+.progress-line span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12.5%;
+  height: 1px;
+  background: var(--gold);
+  box-shadow: 0 0 10px rgba(199,168,106,.5);
+  transition: width .8s var(--ease);
+}
+
+.progress-current {
+  color: var(--gold);
+}
+
+
+/* =========================================================
+   NAVIGATION HINT
+========================================================= */
+
+.navigation-hint {
+  position: fixed;
+  z-index: 300;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(242,240,234,.4);
+  font-family: "Courier New", monospace;
+  font-size: 7px;
+  letter-spacing: .12em;
+  pointer-events: none;
+  transition:
+    opacity .5s ease,
+    transform .5s var(--ease);
+}
+
+.navigation-hint i {
+  display: block;
+  width: 25px;
+  height: 1px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(199,168,106,.1),
+      var(--gold)
+    );
+  animation: hintMove 1.8s ease-in-out infinite;
+}
+
+.navigation-hint.is-hidden {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+}
+
+@keyframes hintMove {
+  0%, 100% {
+    transform: scaleX(.5);
+    transform-origin: left;
+  }
+  50% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+
+/* =========================================================
+   SCENE TRANSITIONS
+========================================================= */
+
+.scene-copy > * {
+  opacity: .35;
+  transform: translateY(20px);
+  transition:
+    opacity .8s ease,
+    transform .9s var(--ease);
+}
+
+.scene.is-active .scene-copy > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scene.is-active .scene-meta {
+  transition-delay: .1s;
+}
+
+.scene.is-active h1,
+.scene.is-active h2 {
+  transition-delay: .18s;
+}
+
+.scene.is-active p {
+  transition-delay: .26s;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 760px) {
+
+  .header {
+    height: 72px;
+    padding:
+      env(safe-area-inset-top)
+      16px
+      0
+      16px;
+    grid-template-columns: auto 1fr auto;
   }
 
-  const index =
-    Number(match[1]) - 1;
+  .header-brand {
+    font-size: 17px;
+  }
 
-  if (
-    Number.isInteger(index) &&
-    index >= 0 &&
-    index < scenes.length
-  ) {
+  .header-order {
+    justify-self: center;
+    padding: 8px 10px;
+    font-size: 8px;
+    letter-spacing: .08em;
+  }
 
-    goTo(index, {
-      force: true,
-      instant: true
-    });
+  .header-status {
+    display: none;
+  }
 
+  .header-right {
+    gap: 8px;
+  }
+
+  .header-time {
+    display: none;
+  }
+
+  .menu-button {
+    display: block;
+  }
+
+  .scene-inner {
+    padding:
+      86px
+      16px
+      42px;
+  }
+
+  .scene-copy {
+    padding-bottom: 14px;
+  }
+
+  .scene-meta {
+    margin-bottom: 13px;
+    font-size: 7px;
+  }
+
+  .scene h1,
+  .scene h2 {
+    font-size: clamp(39px, 13vw, 72px);
+    line-height: .88;
+  }
+
+  .scene p {
+    max-width: 330px;
+    margin-top: 13px;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .media-frame {
+    min-height: 0;
+  }
+
+  .media-label {
+    font-size: 7px;
+    padding: 6px 7px;
+  }
+
+  .media-label.top-left {
+    top: 10px;
+    left: 10px;
+  }
+
+  .media-label.bottom-right {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .scene-progress {
+    left: 16px;
+    right: 16px;
+    bottom: 11px;
+  }
+
+  .navigation-hint {
+    bottom: 34px;
+  }
+
+  .control-network {
+    min-height: 0;
+  }
+
+  .network-node {
+    width: 104px;
+    min-height: 62px;
+    padding: 8px;
+  }
+
+  .network-node strong {
+    font-size: 10px;
+  }
+
+  .network-node small {
+    font-size: 6px;
+  }
+
+  .network-node span {
+    font-size: 6px;
+    margin-bottom: 4px;
+  }
+
+  .node-one {
+    left: 3%;
+    top: 5%;
+  }
+
+  .node-two {
+    right: 3%;
+    top: 5%;
+  }
+
+  .node-three {
+    left: 3%;
+    bottom: 5%;
+  }
+
+  .node-four {
+    right: 3%;
+    bottom: 5%;
+  }
+
+  .central-control {
+    width: min(180px, 42vw);
+  }
+
+  .central-text {
+    width: 140px;
+  }
+
+  .central-text strong {
+    font-size: 11px;
+  }
+
+  .central-text small {
+    font-size: 6px;
+  }
+
+  .network-event {
+    bottom: 10px;
+    font-size: 6px;
+  }
+
+  .contact-info {
+    left: 14px;
+    bottom: 15px;
+  }
+
+  .contact-info strong {
+    font-size: 24px;
+  }
+
+  .contact-button {
+    right: 14px;
+    bottom: 14px;
+    padding: 12px 14px;
+    font-size: 8px;
+  }
+
+  .fiction-note {
+    font-size: 6px;
+  }
+
+  .loader-content {
+    width: calc(100% - 32px);
+  }
+
+  .loader-author {
+    width: 88px;
+    height: 28px;
+    margin-bottom: 25px;
+  }
+
+  .loader-brand {
+    font-size: 60px;
+    margin-bottom: 50px;
+  }
+
+  .loader-check {
+    min-height: 44px;
+    font-size: 8px;
+    letter-spacing: .05em;
+  }
+
+  .loader-check strong {
+    min-width: 52px;
+  }
+}
+
+
+/* =========================================================
+   SMALL HEIGHT DEVICES
+========================================================= */
+
+@media (max-height: 700px) and (min-width: 761px) {
+
+  .header {
+    height: 68px;
+  }
+
+  .scene-inner {
+    padding-top: 82px;
+    padding-bottom: 44px;
+  }
+
+  .scene h1,
+  .scene h2 {
+    font-size: clamp(38px, 6vw, 76px);
+  }
+
+  .scene p {
+    margin-top: 11px;
+    font-size: 11px;
+  }
+
+  .scene-copy {
+    padding-bottom: 11px;
+  }
+
+  .media-frame {
+    min-height: 0;
+  }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
   }
 
 }
-
-readHash();
-
-
-/* =====================================================
-   INITIAL STATE
-===================================================== */
-
-window.addEventListener(
-  "load",
-  () => {
-
-    updateNetworkGeometry();
-    updateProgress(0);
-
-    setTimeout(() => {
-      activateScene(0);
-    }, 4300);
-
-  }
-);
