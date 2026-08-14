@@ -4,36 +4,33 @@
   const experience = document.getElementById("experience");
   const scenes = [...document.querySelectorAll(".scene")];
 
+  const loader = document.getElementById("loader");
+  const loaderProgress = document.getElementById("loaderProgress");
+  const loaderProgressBar = document.getElementById("loaderProgressBar");
+  const loaderReady = document.getElementById("loaderReady");
+  const loaderChecks = [...document.querySelectorAll(".loader-check")];
+
+  const currentSceneEl = document.getElementById("currentScene");
+  const progressBar = document.getElementById("progressBar");
+  const clock = document.getElementById("clock");
+
   const menu = document.getElementById("menu");
   const menuButton = document.getElementById("menuButton");
-  const menuClose = document.getElementById("menuClose");
-  const menuItems = [...document.querySelectorAll(".menu-item")];
+  const menuScenes = [...document.querySelectorAll(".menu-scene")];
 
-  const clock = document.getElementById("clock");
-  const progressCurrent = document.getElementById("progressCurrent");
-  const progressFill = document.getElementById("progressFill");
-
-  const loader = document.getElementById("loader");
-  const loaderStatus = document.getElementById("loaderStatus");
-  const loaderProgressBar = document.getElementById("loaderProgressBar");
-  const loaderChecks = [...document.querySelectorAll(".loader-check")];
-  const loaderReady = document.querySelector(".loader-ready");
+  const totalScenes = scenes.length;
 
   let currentScene = 0;
   let isMoving = false;
-
   let pointerDown = false;
   let pointerStartX = 0;
-  let pointerLastX = 0;
-  let pointerMoved = false;
-
-  let wheelLocked = false;
-  let wheelAccumulator = 0;
-
-  let audioCtx = null;
-  let audioUnlocked = false;
-
+  let pointerStartTranslate = 0;
+  let currentTranslate = 0;
+  let targetTranslate = 0;
   let lastSceneSound = -1;
+
+  let audioContext = null;
+  let audioUnlocked = false;
 
 
   /* =========================================
@@ -41,246 +38,261 @@
   ========================================= */
 
   function initAudio() {
-    if (audioCtx) return audioCtx;
-
-    const AudioContext =
-      window.AudioContext ||
-      window.webkitAudioContext;
-
-    if (!AudioContext) return null;
+    if (audioContext) return audioContext;
 
     try {
-      audioCtx = new AudioContext();
-    } catch {
-      audioCtx = null;
-    }
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
-    return audioCtx;
-  }
-
-  async function unlockAudio() {
-    const ctx = initAudio();
-
-    if (!ctx) return false;
-
-    try {
-      if (ctx.state !== "running") {
-        await ctx.resume();
+      if (!AudioCtx) {
+        return null;
       }
 
-      audioUnlocked = ctx.state === "running";
-    } catch {
-      audioUnlocked = false;
+      audioContext = new AudioCtx();
+      return audioContext;
+    } catch (error) {
+      return null;
+    }
+  }
+
+
+  function unlockAudio() {
+    const ctx = initAudio();
+
+    if (!ctx) {
+      return;
     }
 
-    return audioUnlocked;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    audioUnlocked = true;
   }
 
-  function audioTime() {
-    return audioCtx ? audioCtx.currentTime : 0;
-  }
 
-  function tone({
+  function createTone({
     frequency = 440,
     duration = 0.08,
-    type = "sine",
     volume = 0.035,
-    delay = 0,
-    attack = 0.008,
-    release = 0.06
+    type = "sine",
+    delay = 0
   } = {}) {
 
     const ctx = initAudio();
 
-    if (!ctx || ctx.state !== "running") return;
+    if (!ctx || !audioUnlocked) {
+      return;
+    }
 
-    const now = audioTime() + delay;
+    try {
+      const now = ctx.currentTime + delay;
 
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, now);
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, now);
 
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(volume, now + attack);
-    gain.gain.setValueAtTime(volume, now + Math.max(attack, duration - release));
-    gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      now + duration
-    );
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(
+        Math.max(volume, 0.0002),
+        now + 0.012
+      );
 
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        now + duration
+      );
 
-    oscillator.start(now);
-    oscillator.stop(now + duration + 0.02);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.025);
+    } catch (error) {
+      // Audio is decorative. Navigation must never depend on it.
+    }
   }
+
 
   function soundClick() {
-    tone({
-      frequency: 950,
-      duration: 0.055,
-      type: "square",
-      volume: 0.028
+    createTone({
+      frequency: 760,
+      duration: 0.045,
+      volume: 0.035,
+      type: "square"
     });
   }
+
 
   function soundScan() {
-    tone({
-      frequency: 280,
-      duration: 0.15,
-      type: "sine",
-      volume: 0.024
+    createTone({
+      frequency: 390,
+      duration: 0.07,
+      volume: 0.025,
+      type: "sine"
     });
 
-    tone({
-      frequency: 620,
-      duration: 0.08,
+    createTone({
+      frequency: 720,
+      duration: 0.045,
+      volume: 0.02,
       type: "sine",
-      volume: 0.018,
-      delay: 0.07
+      delay: 0.09
     });
   }
+
 
   function soundDetection() {
-    tone({
-      frequency: 150,
-      duration: 0.18,
-      type: "sine",
-      volume: 0.038
+    createTone({
+      frequency: 170,
+      duration: 0.22,
+      volume: 0.035,
+      type: "sine"
     });
 
-    tone({
+    createTone({
       frequency: 540,
       duration: 0.055,
+      volume: 0.03,
       type: "square",
-      volume: 0.022,
-      delay: 0.17
+      delay: 0.2
     });
 
-    tone({
-      frequency: 720,
+    createTone({
+      frequency: 680,
       duration: 0.055,
+      volume: 0.03,
       type: "square",
-      volume: 0.02,
-      delay: 0.25
+      delay: 0.29
     });
   }
+
 
   function soundAccess() {
-    tone({
-      frequency: 820,
-      duration: 0.07,
-      type: "sine",
-      volume: 0.028
+    createTone({
+      frequency: 620,
+      duration: 0.06,
+      volume: 0.035,
+      type: "square"
     });
 
-    tone({
-      frequency: 1160,
-      duration: 0.11,
+    createTone({
+      frequency: 940,
+      duration: 0.1,
+      volume: 0.03,
       type: "sine",
-      volume: 0.028,
-      delay: 0.08
+      delay: 0.09
     });
   }
+
 
   function soundWarning() {
-    tone({
-      frequency: 125,
-      duration: 0.25,
-      type: "sine",
-      volume: 0.045
+    createTone({
+      frequency: 120,
+      duration: 0.3,
+      volume: 0.04,
+      type: "sine"
     });
 
-    tone({
+    createTone({
       frequency: 180,
-      duration: 0.16,
+      duration: 0.2,
+      volume: 0.025,
       type: "sine",
-      volume: 0.03,
-      delay: 0.16
+      delay: 0.2
     });
   }
+
 
   function soundService() {
-    tone({
-      frequency: 210,
-      duration: 0.07,
-      type: "square",
-      volume: 0.025
+    createTone({
+      frequency: 280,
+      duration: 0.045,
+      volume: 0.028,
+      type: "square"
     });
 
-    tone({
-      frequency: 320,
-      duration: 0.07,
-      type: "square",
+    createTone({
+      frequency: 340,
+      duration: 0.045,
       volume: 0.022,
-      delay: 0.11
+      type: "square",
+      delay: 0.09
+    });
+
+    createTone({
+      frequency: 410,
+      duration: 0.055,
+      volume: 0.025,
+      type: "square",
+      delay: 0.18
     });
   }
 
+
   function soundNetwork() {
-    tone({
-      frequency: 430,
+    createTone({
+      frequency: 310,
       duration: 0.07,
-      type: "sine",
-      volume: 0.022
+      volume: 0.025,
+      type: "sine"
     });
 
-    tone({
-      frequency: 570,
-      duration: 0.09,
+    createTone({
+      frequency: 460,
+      duration: 0.07,
+      volume: 0.025,
       type: "sine",
-      volume: 0.024,
       delay: 0.12
     });
 
-    tone({
-      frequency: 760,
-      duration: 0.12,
+    createTone({
+      frequency: 680,
+      duration: 0.14,
+      volume: 0.035,
       type: "sine",
-      volume: 0.026,
       delay: 0.25
     });
   }
 
+
   function soundReady() {
-    tone({
-      frequency: 520,
+    createTone({
+      frequency: 420,
       duration: 0.08,
-      type: "sine",
-      volume: 0.022
+      volume: 0.025,
+      type: "sine"
     });
 
-    tone({
-      frequency: 780,
-      duration: 0.12,
+    createTone({
+      frequency: 660,
+      duration: 0.1,
+      volume: 0.03,
       type: "sine",
-      volume: 0.028,
       delay: 0.1
     });
 
-    tone({
-      frequency: 1040,
-      duration: 0.18,
+    createTone({
+      frequency: 880,
+      duration: 0.16,
+      volume: 0.035,
       type: "sine",
-      volume: 0.025,
       delay: 0.22
     });
   }
 
-  function playSceneSound(index) {
 
-    if (lastSceneSound === index) return;
+  function playSceneSound(index) {
+    unlockAudio();
+
+    if (lastSceneSound === index) {
+      return;
+    }
 
     lastSceneSound = index;
 
-    unlockAudio();
-
-    setTimeout(() => {
-
-      if (!audioUnlocked) return;
-
+    window.setTimeout(() => {
       switch (index) {
         case 0:
           soundClick();
@@ -314,35 +326,8 @@
           soundReady();
           break;
       }
-
-    }, 90);
+    }, 80);
   }
-
-
-  /*
-   * Browser autoplay policy:
-   * sound is prepared automatically, but if the browser
-   * suspends AudioContext, the first natural tap/click/key
-   * unlocks it. No visible activation button is needed.
-   */
-
-  initAudio();
-
-  window.addEventListener("pointerdown", unlockAudio, {
-    passive: true
-  });
-
-  window.addEventListener("touchstart", unlockAudio, {
-    passive: true
-  });
-
-  window.addEventListener("keydown", unlockAudio);
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      unlockAudio();
-    }
-  });
 
 
   /* =========================================
@@ -350,7 +335,6 @@
   ========================================= */
 
   function updateClock() {
-
     if (!clock) return;
 
     const now = new Date();
@@ -359,144 +343,137 @@
     const minutes = String(now.getMinutes()).padStart(2, "0");
     const seconds = String(now.getSeconds()).padStart(2, "0");
 
-    clock.textContent =
-      `${hours}:${minutes}:${seconds}`;
+    clock.textContent = `${hours}:${minutes}:${seconds}`;
   }
 
   updateClock();
-  setInterval(updateClock, 1000);
+  window.setInterval(updateClock, 1000);
 
 
   /* =========================================
-     SCENE POSITION
+     SCENE STATE
   ========================================= */
 
-  function updateUI(index) {
-
-    progressCurrent.textContent =
-      String(index + 1).padStart(2, "0");
-
-    progressFill.style.width =
-      `${((index + 1) / scenes.length) * 100}%`;
-
-    menuItems.forEach((item, i) => {
-      item.classList.toggle("active", i === index);
+  function setSceneActive(index) {
+    scenes.forEach((scene, sceneIndex) => {
+      scene.classList.toggle("is-active", sceneIndex === index);
     });
+
+    currentScene = index;
+
+    if (currentSceneEl) {
+      currentSceneEl.textContent = String(index + 1).padStart(2, "0");
+    }
+
+    if (progressBar) {
+      const percentage =
+        ((index + 1) / totalScenes) * 100;
+
+      progressBar.style.width = `${percentage}%`;
+    }
+
+    menuScenes.forEach((item, itemIndex) => {
+      item.classList.toggle("is-current", itemIndex === index);
+    });
+
+    playSceneSound(index);
   }
 
 
-  function setSceneActive(index) {
+  /* =========================================
+     TRANSLATION
+  ========================================= */
 
-    scenes.forEach((scene, i) => {
-      scene.classList.toggle(
-        "is-active",
-        i === index
-      );
-    });
+  function getTranslateForScene(index) {
+    return -(index * window.innerWidth);
+  }
 
-    updateUI(index);
+
+  function applyTransform(value) {
+    currentTranslate = value;
+
+    experience.style.transform =
+      `translate3d(${value}px, 0, 0)`;
   }
 
 
   function goToScene(index, force = false) {
+    index = Math.max(
+      0,
+      Math.min(totalScenes - 1, index)
+    );
 
-    if (index < 0) index = 0;
-    if (index > scenes.length - 1) {
-      index = scenes.length - 1;
+    if (isMoving && !force) {
+      return;
     }
 
-    if (!force && index === currentScene) return;
-    if (isMoving && !force) return;
+    if (index === currentScene && !force) {
+      return;
+    }
 
-    currentScene = index;
     isMoving = true;
 
-    experience.style.transform =
-      `translate3d(${-index * 100}vw, 0, 0)`;
+    currentScene = index;
+    targetTranslate = getTranslateForScene(index);
+
+    experience.style.transition =
+      "transform 850ms cubic-bezier(.22,.61,.36,1)";
+
+    applyTransform(targetTranslate);
 
     setSceneActive(index);
-    playSceneSound(index);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       isMoving = false;
-    }, 850);
+      experience.style.transition = "";
+    }, 870);
   }
-
-
-  /* =========================================
-     MENU
-  ========================================= */
-
-  function openMenu() {
-    menu.classList.add("open");
-  }
-
-  function closeMenu() {
-    menu.classList.remove("open");
-  }
-
-  menuButton.addEventListener("click", () => {
-    openMenu();
-    unlockAudio();
-  });
-
-  menuClose.addEventListener("click", closeMenu);
-
-  menuItems.forEach(item => {
-
-    item.addEventListener("click", () => {
-
-      const index =
-        Number(item.dataset.scene);
-
-      closeMenu();
-      goToScene(index, true);
-    });
-
-  });
 
 
   /* =========================================
      WHEEL / TRACKPAD
   ========================================= */
 
-  window.addEventListener(
-    "wheel",
-    (event) => {
+  let wheelLocked = false;
+  let wheelAccumulator = 0;
 
-      if (menu.classList.contains("open")) return;
+  function handleWheel(event) {
+    event.preventDefault();
 
-      event.preventDefault();
-
-      if (wheelLocked) return;
-
-      const delta =
-        Math.abs(event.deltaX) > Math.abs(event.deltaY)
-          ? event.deltaX
-          : event.deltaY;
-
-      wheelAccumulator += delta;
-
-      if (Math.abs(wheelAccumulator) < 35) {
-        return;
-      }
-
-      const direction =
-        wheelAccumulator > 0 ? 1 : -1;
-
-      wheelAccumulator = 0;
-      wheelLocked = true;
-
-      goToScene(currentScene + direction);
-
-      setTimeout(() => {
-        wheelLocked = false;
-      }, 720);
-
-    },
-    {
-      passive: false
+    if (menu.classList.contains("is-open")) {
+      return;
     }
+
+    wheelAccumulator +=
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+
+    if (wheelLocked) {
+      return;
+    }
+
+    if (Math.abs(wheelAccumulator) < 18) {
+      return;
+    }
+
+    const direction =
+      wheelAccumulator > 0 ? 1 : -1;
+
+    wheelAccumulator = 0;
+    wheelLocked = true;
+
+    goToScene(currentScene + direction, true);
+
+    window.setTimeout(() => {
+      wheelLocked = false;
+    }, 900);
+  }
+
+  experience.addEventListener(
+    "wheel",
+    handleWheel,
+    { passive: false }
   );
 
 
@@ -504,113 +481,99 @@
      POINTER DRAG
   ========================================= */
 
-  experience.addEventListener(
-    "pointerdown",
-    (event) => {
+  function handlePointerDown(event) {
+    if (menu.classList.contains("is-open")) {
+      return;
+    }
 
-      if (event.pointerType === "mouse" && event.button !== 0) {
-        return;
+    pointerDown = true;
+    pointerStartX = event.clientX;
+    pointerStartTranslate = currentTranslate;
+
+    experience.classList.add("is-dragging");
+
+    experience.style.transition = "";
+
+    unlockAudio();
+
+    try {
+      experience.setPointerCapture(event.pointerId);
+    } catch (error) {}
+  }
+
+
+  function handlePointerMove(event) {
+    if (!pointerDown) {
+      return;
+    }
+
+    const delta = event.clientX - pointerStartX;
+
+    let next = pointerStartTranslate + delta;
+
+    const minTranslate =
+      -((totalScenes - 1) * window.innerWidth);
+
+    next = Math.max(
+      minTranslate,
+      Math.min(0, next)
+    );
+
+    applyTransform(next);
+  }
+
+
+  function handlePointerUp(event) {
+    if (!pointerDown) {
+      return;
+    }
+
+    pointerDown = false;
+
+    experience.classList.remove("is-dragging");
+
+    try {
+      experience.releasePointerCapture(event.pointerId);
+    } catch (error) {}
+
+    const moved =
+      currentTranslate - pointerStartTranslate;
+
+    const threshold =
+      Math.min(130, window.innerWidth * 0.18);
+
+    if (Math.abs(moved) > threshold) {
+
+      if (moved < 0) {
+        goToScene(currentScene + 1, true);
+      } else {
+        goToScene(currentScene - 1, true);
       }
 
-      unlockAudio();
-
-      pointerDown = true;
-      pointerMoved = false;
-
-      pointerStartX = event.clientX;
-      pointerLastX = event.clientX;
-
-      experience.setPointerCapture?.(event.pointerId);
-
-      experience.style.transition = "none";
+    } else {
+      goToScene(currentScene, true);
     }
-  );
+  }
 
+
+  experience.addEventListener(
+    "pointerdown",
+    handlePointerDown
+  );
 
   experience.addEventListener(
     "pointermove",
-    (event) => {
-
-      if (!pointerDown) return;
-
-      const delta =
-        event.clientX - pointerStartX;
-
-      const moveDelta =
-        event.clientX - pointerLastX;
-
-      pointerLastX = event.clientX;
-
-      if (Math.abs(delta) > 8) {
-        pointerMoved = true;
-      }
-
-      if (!pointerMoved) return;
-
-      const base =
-        -currentScene * window.innerWidth;
-
-      const limited =
-        Math.max(
-          -((scenes.length - 1) * window.innerWidth),
-          Math.min(0, base + delta)
-        );
-
-      experience.style.transform =
-        `translate3d(${limited}px, 0, 0)`;
-
-      if (Math.abs(moveDelta) > 1) {
-        event.preventDefault();
-      }
-
-    }
+    handlePointerMove
   );
-
 
   experience.addEventListener(
     "pointerup",
-    (event) => {
-
-      if (!pointerDown) return;
-
-      pointerDown = false;
-
-      experience.releasePointerCapture?.(event.pointerId);
-
-      experience.style.transition =
-        "transform .8s cubic-bezier(.22,.61,.36,1)";
-
-      const delta =
-        event.clientX - pointerStartX;
-
-      if (Math.abs(delta) > 55) {
-
-        if (delta < 0) {
-          goToScene(currentScene + 1);
-        } else {
-          goToScene(currentScene - 1);
-        }
-
-      } else {
-
-        goToScene(currentScene, true);
-      }
-
-    }
+    handlePointerUp
   );
-
 
   experience.addEventListener(
     "pointercancel",
-    () => {
-
-      pointerDown = false;
-
-      experience.style.transition =
-        "transform .8s cubic-bezier(.22,.61,.36,1)";
-
-      goToScene(currentScene, true);
-    }
+    handlePointerUp
   );
 
 
@@ -618,20 +581,23 @@
      KEYBOARD
   ========================================= */
 
-  window.addEventListener("keydown", (event) => {
+  document.addEventListener("keydown", (event) => {
 
-    if (menu.classList.contains("open")) {
+    unlockAudio();
 
-      if (event.key === "Escape") {
-        closeMenu();
-      }
+    if (event.key === "Escape") {
+      closeMenu();
+      return;
+    }
 
+    if (menu.classList.contains("is-open")) {
       return;
     }
 
     if (
       event.key === "ArrowRight" ||
-      event.key === "ArrowDown"
+      event.key === "ArrowDown" ||
+      event.key === " "
     ) {
       event.preventDefault();
       goToScene(currentScene + 1);
@@ -647,12 +613,12 @@
 
     if (event.key === "Home") {
       event.preventDefault();
-      goToScene(0);
+      goToScene(0, true);
     }
 
     if (event.key === "End") {
       event.preventDefault();
-      goToScene(scenes.length - 1);
+      goToScene(totalScenes - 1, true);
     }
   });
 
@@ -661,27 +627,87 @@
      RESIZE
   ========================================= */
 
-  let resizeTimer;
-
   window.addEventListener("resize", () => {
+    currentTranslate =
+      getTranslateForScene(currentScene);
 
-    clearTimeout(resizeTimer);
+    targetTranslate = currentTranslate;
 
-    resizeTimer = setTimeout(() => {
+    experience.style.transition = "none";
 
-      experience.style.transition = "none";
+    applyTransform(currentTranslate);
 
-      experience.style.transform =
-        `translate3d(${-currentScene * 100}vw, 0, 0)`;
+    window.requestAnimationFrame(() => {
+      experience.style.transition = "";
+    });
+  });
 
-      requestAnimationFrame(() => {
 
-        experience.style.transition =
-          "transform .8s cubic-bezier(.22,.61,.36,1)";
+  /* =========================================
+     MENU
+  ========================================= */
 
-      });
+  function openMenu() {
+    menu.classList.add("is-open");
+    menuButton.classList.add("is-open");
+    document.body.classList.add("menu-open");
 
-    }, 100);
+    soundClick();
+  }
+
+
+  function closeMenu() {
+    menu.classList.remove("is-open");
+    menuButton.classList.remove("is-open");
+    document.body.classList.remove("menu-open");
+  }
+
+
+  menuButton.addEventListener("click", () => {
+    unlockAudio();
+
+    if (menu.classList.contains("is-open")) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  });
+
+
+  menuScenes.forEach((item) => {
+    item.addEventListener("click", () => {
+
+      unlockAudio();
+
+      const index =
+        Number(item.dataset.scene);
+
+      closeMenu();
+
+      window.setTimeout(() => {
+        goToScene(index, true);
+      }, 100);
+    });
+  });
+
+
+  /* =========================================
+     NATURAL AUDIO UNLOCK
+  ========================================= */
+
+  [
+    "pointerdown",
+    "touchstart",
+    "keydown"
+  ].forEach((eventName) => {
+    document.addEventListener(
+      eventName,
+      unlockAudio,
+      {
+        passive: true,
+        once: false
+      }
+    );
   });
 
 
@@ -689,91 +715,116 @@
      LOADER
   ========================================= */
 
-  const loaderTexts = [
-    "ПРОВЕРКА ВИДЕОНАБЛЮДЕНИЯ",
-    "ПРОВЕРКА ПОЖАРНОЙ БЕЗОПАСНОСТИ",
-    "ПРОВЕРКА СКУД",
-    "ПРОВЕРКА СОСТОЯНИЯ ОБЪЕКТА",
-    "СИНХРОНИЗАЦИЯ ЦЕНТРА КОНТРОЛЯ"
-  ];
+  function updateLoaderProgress(value) {
+    value = Math.max(0, Math.min(100, value));
 
-
-  function activateLoaderCheck(index) {
-
-    const check = loaderChecks[index];
-
-    if (!check) return;
-
-    check.classList.add("active");
-
-    const status = check.querySelector("b");
-
-    if (status) {
-      status.textContent = "OK";
-    }
-
-    if (index % 2 === 0) {
-      soundClick();
-    } else {
-      soundService();
-    }
+    loaderProgress.textContent =
+      `${Math.round(value)}%`;
 
     loaderProgressBar.style.width =
-      `${((index + 1) / loaderChecks.length) * 100}%`;
+      `${value}%`;
+  }
+
+
+  function runLoaderCheck(index) {
+
+    const item = loaderChecks[index];
+
+    if (!item) {
+      return;
+    }
+
+    item.classList.add("is-active");
+
+    const state =
+      item.querySelector(".check-state");
+
+    if (state) {
+      state.textContent = "ПРОВЕРКА";
+    }
+
+    soundClick();
+
+    window.setTimeout(() => {
+
+      item.classList.remove("is-active");
+      item.classList.add("is-done");
+
+      if (state) {
+        state.textContent = "ГОТОВО";
+      }
+
+    }, 430);
   }
 
 
   function runLoader() {
 
-    let index = 0;
+    updateLoaderProgress(0);
 
-    loaderStatus.textContent =
-      "ПРОВЕРКА СИСТЕМЫ";
+    const checkDuration = 520;
+    const totalDuration =
+      loaderChecks.length * checkDuration;
 
-    const interval = setInterval(() => {
+    loaderChecks.forEach((item) => {
+      item.classList.remove("is-active", "is-done");
 
-      if (index >= loaderChecks.length) {
+      const state =
+        item.querySelector(".check-state");
 
-        clearInterval(interval);
-
-        loaderStatus.textContent =
-          "СИСТЕМА ГОТОВА";
-
-        loaderReady.classList.add("visible");
-
-        soundReady();
-
-        setTimeout(() => {
-
-          loader.classList.add("hidden");
-
-          setSceneActive(0);
-          playSceneSound(0);
-
-        }, 900);
-
-        return;
+      if (state) {
+        state.textContent = "ОЖИДАНИЕ";
       }
+    });
 
-      loaderStatus.textContent =
-        loaderTexts[index];
+    loaderReady.classList.remove("is-visible");
 
-      activateLoaderCheck(index);
+    loaderChecks.forEach((_, index) => {
 
-      index++;
+      window.setTimeout(() => {
 
-    }, 650);
+        runLoaderCheck(index);
+
+        const progress =
+          ((index + 1) / loaderChecks.length) * 100;
+
+        updateLoaderProgress(progress);
+
+      }, index * checkDuration);
+    });
+
+    window.setTimeout(() => {
+
+      loaderReady.classList.add("is-visible");
+
+      soundReady();
+
+    }, totalDuration + 180);
+
+    window.setTimeout(() => {
+
+      loader.classList.add("is-hidden");
+
+    }, totalDuration + 950);
   }
 
 
   /* =========================================
-     START
+     INITIAL STATE
   ========================================= */
 
   setSceneActive(0);
 
-  setTimeout(() => {
-    runLoader();
-  }, 500);
+  currentTranslate = 0;
+  targetTranslate = 0;
+
+  experience.style.transition = "none";
+  applyTransform(0);
+
+  window.setTimeout(() => {
+    experience.style.transition = "";
+  }, 100);
+
+  runLoader();
 
 })();
