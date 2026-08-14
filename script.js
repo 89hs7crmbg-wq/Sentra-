@@ -1,688 +1,373 @@
-/* =====================================================
-   SENTRA
-   DIGITAL CONTROL EXPERIENCE
-===================================================== */
+(() => {
+  "use strict";
 
-"use strict";
+  /* =====================================================
+     ELEMENTS
+  ===================================================== */
 
+  const loader = document.getElementById("loader");
+  const loaderProgress = document.getElementById("loaderProgress");
+  const loaderPercent = document.getElementById("loaderPercent");
+  const loaderChecks = [...document.querySelectorAll(".loader-check")];
+  const loaderFinal = document.getElementById("loaderFinal");
 
-/* =====================================================
-   DOM
-===================================================== */
+  const site = document.getElementById("site");
+  const experience = document.getElementById("experience");
+  const track = document.getElementById("track");
 
-const loader = document.getElementById("loader");
-const loaderProgress = document.getElementById("loaderProgress");
-const loaderStatus = document.getElementById("loaderStatus");
+  const scenes = [...document.querySelectorAll(".scene")];
 
-const site = document.getElementById("site");
-const experience = document.getElementById("experience");
-const track = document.getElementById("track");
+  const liveDate = document.getElementById("liveDate");
+  const liveTime = document.getElementById("liveTime");
 
-const headerCta = document.getElementById("headerCta");
+  const progressCurrent = document.getElementById("progressCurrent");
+  const progressFill = document.getElementById("progressFill");
 
-const liveDate = document.getElementById("liveDate");
-const liveTime = document.getElementById("liveTime");
+  const navigationHint = document.getElementById("navigationHint");
 
-const menuButton = document.getElementById("menuButton");
-const mobileMenu = document.getElementById("mobileMenu");
-
-const currentSceneElement =
-  document.getElementById("currentScene");
-
-const progressFill =
-  document.getElementById("progressFill");
-
-const navigationHint =
-  document.getElementById("navigationHint");
-
-const scenes =
-  Array.from(document.querySelectorAll(".scene"));
-
-const mobileNavItems =
-  Array.from(document.querySelectorAll(".mobile-nav-item"));
-
-const brand =
-  document.querySelector(".brand");
-
-const TOTAL_SCENES = scenes.length;
-
-let currentIndex = 0;
-
-let isMoving = false;
-let wheelLocked = false;
-
-let pointerStartX = 0;
-let pointerStartY = 0;
-
-let pointerCurrentX = 0;
-
-let isPointerDragging = false;
-
-let touchStartX = 0;
-let touchStartY = 0;
-
-let touchCurrentX = 0;
-
-let lastWheelTime = 0;
-
-const WHEEL_THRESHOLD = 55;
-const WHEEL_LOCK_TIME = 650;
-
-const DRAG_THRESHOLD = 80;
-
-
-/* =====================================================
-   VK CTA
-===================================================== */
-
-const VK_URL = "https://vk.ru/id_aikharisov";
-
-function openVK() {
-  window.open(
-    VK_URL,
-    "_blank",
-    "noopener,noreferrer"
-  );
-}
-
-if (headerCta) {
-  headerCta.addEventListener("click", openVK);
-}
-
-
-/* =====================================================
-   LIVE DATE / TIME
-===================================================== */
-
-function updateClock() {
-
-  const now = new Date();
-
-  const dateFormatter =
-    new Intl.DateTimeFormat(
-      "ru-RU",
-      {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-      }
-    );
-
-  const timeFormatter =
-    new Intl.DateTimeFormat(
-      "ru-RU",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-      }
-    );
-
-  liveDate.textContent =
-    dateFormatter.format(now);
-
-  liveTime.textContent =
-    timeFormatter.format(now);
-}
-
-updateClock();
-
-setInterval(updateClock, 1000);
-
-
-/* =====================================================
-   LOADER
-===================================================== */
-
-function runLoader() {
-
-  let progress = 0;
-
-  const statuses = [
-    "Запуск системы",
-    "Проверка соединения",
-    "Синхронизация узлов",
-    "Проверка каналов",
-    "Подключение объекта",
-    "Синхронизация завершена"
+  const menuButton = document.getElementById("menuButton");
+  const mobileMenu = document.getElementById("mobileMenu");
+  const mobileButtons = [
+    ...document.querySelectorAll("[data-go]")
   ];
 
-  let statusIndex = 0;
 
-  const interval = setInterval(() => {
+  /* =====================================================
+     STATE
+  ===================================================== */
 
-    const increment =
-      progress < 35
-        ? 3
-        : progress < 70
-          ? 2
-          : 1;
+  let currentIndex = 0;
 
-    progress += increment;
+  let isAnimating = false;
+  let isDragging = false;
+  let wheelLocked = false;
 
-    if (progress >= 100) {
+  let pointerStartX = 0;
+  let pointerCurrentX = 0;
 
-      progress = 100;
+  let dragStartTranslate = 0;
+  let dragTranslate = 0;
 
-      clearInterval(interval);
+  let loaderStarted = false;
+  let loaderFinished = false;
 
-      loaderProgress.textContent = "100";
+  let networkTimer = null;
 
-      loaderStatus.textContent =
-        statuses[statuses.length - 1];
 
-      document
-        .querySelectorAll(".loader-node")
-        .forEach(node => {
+  /* =====================================================
+     UTILITIES
+  ===================================================== */
 
-          node.style.animationPlayState =
-            "paused";
+  const clamp = (value, min, max) => {
+    return Math.min(Math.max(value, min), max);
+  };
 
-          node.style.opacity = "1";
+  const lerp = (a, b, amount) => {
+    return a + (b - a) * amount;
+  };
 
-          node.style.boxShadow =
-            "0 0 20px rgba(216,187,120,.8)";
-        });
+  const formatScene = (index) => {
+    return String(index + 1).padStart(2, "0");
+  };
 
-      document
-        .querySelectorAll(".loader-trace")
-        .forEach(trace => {
-          trace.style.opacity = ".95";
-        });
 
-      setTimeout(() => {
+  /* =====================================================
+     LIVE DATE / TIME
+  ===================================================== */
 
-        loader.classList.add("is-hidden");
+  function updateClock() {
+    const now = new Date();
 
-        setTimeout(() => {
-          activateScene(currentIndex);
-        }, 120);
+    const date = new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }).format(now);
 
-      }, 850);
+    const time = new Intl.DateTimeFormat("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).format(now);
 
+    liveDate.textContent = date;
+    liveTime.textContent = time;
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+
+
+  /* =====================================================
+     LOADER
+  ===================================================== */
+
+  function setLoaderProgress(value) {
+    const safeValue = clamp(value, 0, 100);
+
+    loaderProgress.style.width = `${safeValue}%`;
+    loaderPercent.textContent =
+      `${String(Math.round(safeValue)).padStart(2, "0")}%`;
+  }
+
+  function setLoaderStep(index) {
+    loaderChecks.forEach((item, itemIndex) => {
+
+      item.classList.remove("is-active");
+
+      if (itemIndex < index) {
+        item.classList.add("is-done");
+        item.querySelector("strong").textContent = "ОК";
+      }
+
+      if (itemIndex === index) {
+        item.classList.add("is-active");
+        item.querySelector("strong").textContent = "ПРОВЕРКА";
+      }
+
+    });
+  }
+
+  function finishLoader() {
+
+    if (loaderFinished) {
       return;
     }
 
-    loaderProgress.textContent =
-      String(progress);
+    loaderFinished = true;
 
-    const newStatusIndex =
-      Math.min(
-        statuses.length - 2,
-        Math.floor(progress / 18)
-      );
+    loaderChecks.forEach((item) => {
+      item.classList.remove("is-active");
+      item.classList.add("is-done");
 
-    if (newStatusIndex !== statusIndex) {
+      const status = item.querySelector("strong");
 
-      statusIndex = newStatusIndex;
-
-      loaderStatus.animate(
-        [
-          {
-            opacity: 0,
-            transform: "translateY(5px)"
-          },
-          {
-            opacity: 1,
-            transform: "translateY(0)"
-          }
-        ],
-        {
-          duration: 350,
-          easing:
-            "cubic-bezier(.16,1,.3,1)"
-        }
-      );
-
-      loaderStatus.textContent =
-        statuses[statusIndex];
-    }
-
-  }, 95);
-}
-
-
-/* =====================================================
-   SCENE POSITION
-===================================================== */
-
-function updateProgress() {
-
-  const number =
-    String(currentIndex + 1)
-      .padStart(2, "0");
-
-  currentSceneElement.textContent =
-    number;
-
-  const percentage =
-    ((currentIndex + 1) / TOTAL_SCENES) * 100;
-
-  progressFill.style.width =
-    `${percentage}%`;
-}
-
-
-/* =====================================================
-   CONTROL CENTER GEOMETRY
-===================================================== */
-
-function updateControlNetworkLines() {
-
-  const network =
-    document.getElementById("controlNetwork");
-
-  const central =
-    document.getElementById("centralControl");
-
-  if (!network || !central) {
-    return;
-  }
-
-  const svg =
-    document.getElementById("networkLines");
-
-  if (!svg) {
-    return;
-  }
-
-  const networkRect =
-    network.getBoundingClientRect();
-
-  const centralRect =
-    central.getBoundingClientRect();
-
-  const centralX =
-    centralRect.left +
-    centralRect.width / 2 -
-    networkRect.left;
-
-  const centralY =
-    centralRect.top +
-    centralRect.height / 2 -
-    networkRect.top;
-
-  const nodes = [
-    {
-      element:
-        document.querySelector(
-          '.network-node[data-node="top-left"]'
-        ),
-      line:
-        document.getElementById("lineTopLeft"),
-      trace:
-        document.getElementById("lineTopLeftTrace")
-    },
-
-    {
-      element:
-        document.querySelector(
-          '.network-node[data-node="top-right"]'
-        ),
-      line:
-        document.getElementById("lineTopRight"),
-      trace:
-        document.getElementById("lineTopRightTrace")
-    },
-
-    {
-      element:
-        document.querySelector(
-          '.network-node[data-node="bottom-left"]'
-        ),
-      line:
-        document.getElementById("lineBottomLeft"),
-      trace:
-        document.getElementById("lineBottomLeftTrace")
-    },
-
-    {
-      element:
-        document.querySelector(
-          '.network-node[data-node="bottom-right"]'
-        ),
-      line:
-        document.getElementById("lineBottomRight"),
-      trace:
-        document.getElementById("lineBottomRightTrace")
-    }
-  ];
-
-  const svgWidth = 1000;
-  const svgHeight = 620;
-
-  const scaleX =
-    svgWidth / networkRect.width;
-
-  const scaleY =
-    svgHeight / networkRect.height;
-
-  nodes.forEach(item => {
-
-    if (!item.element) {
-      return;
-    }
-
-    const rect =
-      item.element.getBoundingClientRect();
-
-    const nodeX =
-      rect.left +
-      rect.width / 2 -
-      networkRect.left;
-
-    const nodeY =
-      rect.top +
-      rect.height / 2 -
-      networkRect.top;
-
-    const x1 =
-      nodeX * scaleX;
-
-    const y1 =
-      nodeY * scaleY;
-
-    const x2 =
-      centralX * scaleX;
-
-    const y2 =
-      centralY * scaleY;
-
-    if (item.line) {
-
-      item.line.setAttribute(
-        "x1",
-        x1
-      );
-
-      item.line.setAttribute(
-        "y1",
-        y1
-      );
-
-      item.line.setAttribute(
-        "x2",
-        x2
-      );
-
-      item.line.setAttribute(
-        "y2",
-        y2
-      );
-    }
-
-    if (item.trace) {
-
-      item.trace.setAttribute(
-        "x1",
-        x1
-      );
-
-      item.trace.setAttribute(
-        "y1",
-        y1
-      );
-
-      item.trace.setAttribute(
-        "x2",
-        x2
-      );
-
-      item.trace.setAttribute(
-        "y2",
-        y2
-      );
-    }
-  });
-}
-
-
-/* =====================================================
-   CONTROL CENTER STATE
-===================================================== */
-
-function activateControlCenter() {
-
-  const scene =
-    document.getElementById("scene-7");
-
-  if (!scene) {
-    return;
-  }
-
-  const nodes =
-    Array.from(
-      scene.querySelectorAll(".network-node")
-    );
-
-  const log =
-    document.getElementById("controlLog");
-
-  const central =
-    document.getElementById("centralControl");
-
-  if (!central) {
-    return;
-  }
-
-  updateControlNetworkLines();
-
-  let active = 0;
-
-  nodes.forEach(node => {
-    node.classList.remove("network-node-active");
-  });
-
-  const cycle = setInterval(() => {
-
-    nodes.forEach(node => {
-      node.classList.remove(
-        "network-node-active"
-      );
+      if (status) {
+        status.textContent = "ОК";
+      }
     });
 
-    if (nodes[active]) {
+    setLoaderProgress(100);
 
-      nodes[active].classList.add(
-        "network-node-active"
-      );
-    }
-
-    if (log) {
-
-      log.innerHTML =
-        `<span>СИНХРОНИЗАЦИЯ</span>
-         <strong>${active + 1} / ${nodes.length}</strong>`;
-    }
-
-    central.classList.remove(
-      "central-control-response"
-    );
-
-    void central.offsetWidth;
-
-    central.classList.add(
-      "central-control-response"
-    );
-
-    active++;
-
-    if (active >= nodes.length) {
-      active = 0;
-    }
-
-  }, 1050);
-
-  scene.dataset.controlInterval =
-    String(cycle);
-}
-
-
-/* =====================================================
-   SCENE ACTIVATION
-===================================================== */
-
-function activateScene(index) {
-
-  scenes.forEach(scene => {
-    scene.classList.remove("is-active");
-  });
-
-  const scene =
-    scenes[index];
-
-  if (!scene) {
-    return;
-  }
-
-  scene.classList.add("is-active");
-
-  if (index === 6) {
-
-    requestAnimationFrame(() => {
-      updateControlNetworkLines();
-    });
+    loaderFinal.classList.add("is-visible");
 
     setTimeout(() => {
-      activateControlCenter();
-    }, 250);
+      loader.classList.add("is-hidden");
+
+      setTimeout(() => {
+        loader.remove();
+      }, 900);
+
+      activateScene(0, false);
+    }, 750);
   }
 
-  updateProgress();
+  function startLoader() {
 
-  updateHash(index);
-
-  updateNavigationHint();
-}
-
-
-/* =====================================================
-   NAVIGATION HINT
-===================================================== */
-
-function updateNavigationHint() {
-
-  if (!navigationHint) {
-    return;
-  }
-
-  if (currentIndex === 0) {
-
-    navigationHint.textContent =
-      "ПЕРЕМЕЩЕНИЕ ПО СИСТЕМЕ";
-
-  } else if (currentIndex === TOTAL_SCENES - 1) {
-
-    navigationHint.textContent =
-      "СИСТЕМА ЗАВЕРШЕНА";
-
-  } else {
-
-    navigationHint.textContent =
-      "СИСТЕМА ПРОДОЛЖАЕТСЯ";
-  }
-}
-
-
-/* =====================================================
-   HASH
-===================================================== */
-
-function updateHash(index) {
-
-  const id =
-    `scene-${index + 1}`;
-
-  if (
-    window.history &&
-    window.history.replaceState
-  ) {
-
-    window.history.replaceState(
-      null,
-      "",
-      `#${id}`
-    );
-  }
-}
-
-
-/* =====================================================
-   GO TO SCENE
-===================================================== */
-
-function goTo(index, options = {}) {
-
-  const force =
-    options.force === true;
-
-  const next =
-    Math.max(
-      0,
-      Math.min(
-        TOTAL_SCENES - 1,
-        index
-      )
-    );
-
-  if (
-    next === currentIndex &&
-    !force
-  ) {
-    return;
-  }
-
-  if (isMoving && !force) {
-    return;
-  }
-
-  isMoving = true;
-
-  currentIndex = next;
-
-  track.style.transform =
-    `translate3d(-${currentIndex * 100}vw, 0, 0)`;
-
-  activateScene(currentIndex);
-
-  setTimeout(() => {
-    isMoving = false;
-  }, 780);
-}
-
-
-/* =====================================================
-   WHEEL
-===================================================== */
-
-experience.addEventListener(
-  "wheel",
-  event => {
-
-    event.preventDefault();
-
-    const now =
-      performance.now();
-
-    if (
-      wheelLocked ||
-      now - lastWheelTime < 450
-    ) {
+    if (loaderStarted) {
       return;
     }
 
-    let delta =
-      Math.abs(event.deltaX) >
-      Math.abs(event.deltaY)
+    loaderStarted = true;
+
+    const duration = 4300;
+    const start = performance.now();
+
+    function animateLoader(now) {
+
+      const elapsed = now - start;
+      const progress = clamp(
+        (elapsed / duration) * 100,
+        0,
+        100
+      );
+
+      setLoaderProgress(progress);
+
+      const step = Math.min(
+        loaderChecks.length - 1,
+        Math.floor((progress / 100) * loaderChecks.length)
+      );
+
+      setLoaderStep(step);
+
+      if (progress >= 100) {
+        finishLoader();
+        return;
+      }
+
+      requestAnimationFrame(animateLoader);
+    }
+
+    requestAnimationFrame(animateLoader);
+  }
+
+
+  /* =====================================================
+     TRANSLATE
+  ===================================================== */
+
+  function getTargetTranslate(index) {
+    return -(index * window.innerWidth);
+  }
+
+  function applyTranslate(value, animate = true) {
+
+    if (!animate) {
+      track.style.transition = "none";
+    } else {
+      track.style.transition =
+        "transform .85s cubic-bezier(.22,.61,.36,1)";
+    }
+
+    track.style.transform =
+      `translate3d(${value}px,0,0)`;
+
+    if (!animate) {
+      requestAnimationFrame(() => {
+        track.style.transition =
+          "transform .85s cubic-bezier(.22,.61,.36,1)";
+      });
+    }
+  }
+
+
+  /* =====================================================
+     SCENE ACTIVATION
+  ===================================================== */
+
+  function activateScene(index, animate = true) {
+
+    index = clamp(index, 0, scenes.length - 1);
+
+    currentIndex = index;
+
+    applyTranslate(
+      getTargetTranslate(index),
+      animate
+    );
+
+    scenes.forEach((scene, sceneIndex) => {
+      scene.classList.toggle(
+        "is-active",
+        sceneIndex === index
+      );
+    });
+
+    progressCurrent.textContent =
+      formatScene(index);
+
+    progressFill.style.width =
+      `${((index + 1) / scenes.length) * 100}%`;
+
+    if (index > 0) {
+      navigationHint.classList.add("is-hidden");
+    } else {
+      navigationHint.classList.remove("is-hidden");
+    }
+
+    if (index === 6) {
+      startNetworkAnimation();
+    } else {
+      stopNetworkAnimation();
+    }
+
+    updateHash(index);
+  }
+
+
+  function goTo(index) {
+
+    if (isAnimating || isDragging) {
+      return;
+    }
+
+    const target = clamp(
+      index,
+      0,
+      scenes.length - 1
+    );
+
+    if (target === currentIndex) {
+      return;
+    }
+
+    isAnimating = true;
+
+    activateScene(target, true);
+
+    setTimeout(() => {
+      isAnimating = false;
+    }, 900);
+  }
+
+
+  /* =====================================================
+     HASH
+  ===================================================== */
+
+  function updateHash(index) {
+
+    const hash = `#scene-${index + 1}`;
+
+    if (history.replaceState) {
+      history.replaceState(null, "", hash);
+    }
+  }
+
+  function readHash() {
+
+    const match =
+      window.location.hash.match(
+        /#scene-(\d+)/
+      );
+
+    if (!match) {
+      return 0;
+    }
+
+    const number = parseInt(
+      match[1],
+      10
+    );
+
+    if (Number.isNaN(number)) {
+      return 0;
+    }
+
+    return clamp(
+      number - 1,
+      0,
+      scenes.length - 1
+    );
+  }
+
+
+  /* =====================================================
+     WHEEL
+  ===================================================== */
+
+  function handleWheel(event) {
+
+    if (isDragging || isAnimating) {
+      return;
+    }
+
+    const delta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
         ? event.deltaX
         : event.deltaY;
 
-    if (Math.abs(delta) < WHEEL_THRESHOLD) {
+    if (Math.abs(delta) < 18) {
       return;
     }
 
-    lastWheelTime = now;
+    event.preventDefault();
+
+    if (wheelLocked) {
+      return;
+    }
 
     wheelLocked = true;
 
@@ -694,306 +379,205 @@ experience.addEventListener(
 
     setTimeout(() => {
       wheelLocked = false;
-    }, WHEEL_LOCK_TIME);
-
-  },
-  {
-    passive: false
+    }, 850);
   }
-);
+
+  experience.addEventListener(
+    "wheel",
+    handleWheel,
+    { passive: false }
+  );
 
 
-/* =====================================================
-   POINTER DRAG
-===================================================== */
+  /* =====================================================
+     POINTER DRAG
+  ===================================================== */
 
-experience.addEventListener(
-  "pointerdown",
-  event => {
+  function handlePointerDown(event) {
 
-    if (event.pointerType === "mouse") {
-
-      pointerStartX =
-        event.clientX;
-
-      pointerStartY =
-        event.clientY;
-
-      pointerCurrentX =
-        event.clientX;
-
-      isPointerDragging = true;
-
-      experience.setPointerCapture(
-        event.pointerId
-      );
-    }
-  }
-);
-
-
-experience.addEventListener(
-  "pointermove",
-  event => {
-
-    if (!isPointerDragging) {
+    if (event.pointerType === "mouse" && event.button !== 0) {
       return;
     }
 
-    pointerCurrentX =
-      event.clientX;
-  }
-);
-
-
-experience.addEventListener(
-  "pointerup",
-  event => {
-
-    if (!isPointerDragging) {
+    if (isAnimating) {
       return;
     }
 
-    isPointerDragging = false;
+    isDragging = true;
+
+    pointerStartX = event.clientX;
+    pointerCurrentX = event.clientX;
+
+    dragStartTranslate =
+      getTargetTranslate(currentIndex);
+
+    dragTranslate = dragStartTranslate;
+
+    track.classList.add("is-dragging");
+
+    experience.setPointerCapture(
+      event.pointerId
+    );
+  }
+
+
+  function handlePointerMove(event) {
+
+    if (!isDragging) {
+      return;
+    }
+
+    pointerCurrentX = event.clientX;
+
+    const delta =
+      pointerCurrentX - pointerStartX;
+
+    const resistance = .92;
+
+    dragTranslate =
+      dragStartTranslate +
+      delta * resistance;
+
+    const maxTranslate = 0;
+    const minTranslate =
+      -((scenes.length - 1) * window.innerWidth);
+
+    if (dragTranslate > maxTranslate) {
+      dragTranslate =
+        lerp(
+          maxTranslate,
+          dragTranslate,
+          .35
+        );
+    }
+
+    if (dragTranslate < minTranslate) {
+      dragTranslate =
+        lerp(
+          minTranslate,
+          dragTranslate,
+          .35
+        );
+    }
+
+    track.style.transform =
+      `translate3d(${dragTranslate}px,0,0)`;
+  }
+
+
+  function handlePointerUp(event) {
+
+    if (!isDragging) {
+      return;
+    }
+
+    isDragging = false;
+
+    track.classList.remove("is-dragging");
 
     try {
       experience.releasePointerCapture(
         event.pointerId
       );
-    } catch (error) {
-      /* capture may already be released */
-    }
+    } catch (_) {}
 
-    const distance =
-      pointerCurrentX -
-      pointerStartX;
+    const delta =
+      pointerCurrentX - pointerStartX;
 
-    if (
-      Math.abs(distance) >=
-      DRAG_THRESHOLD
-    ) {
+    const threshold =
+      Math.min(
+        window.innerWidth * .18,
+        150
+      );
 
-      if (distance < 0) {
+    if (Math.abs(delta) > threshold) {
+
+      if (delta < 0) {
         goTo(currentIndex + 1);
       } else {
         goTo(currentIndex - 1);
       }
 
-    } else {
-
-      goTo(currentIndex, {
-        force: true
-      });
-    }
-  }
-);
-
-
-/* =====================================================
-   TOUCH
-===================================================== */
-
-experience.addEventListener(
-  "touchstart",
-  event => {
-
-    if (!event.touches.length) {
       return;
     }
 
-    const touch =
-      event.touches[0];
-
-    touchStartX =
-      touch.clientX;
-
-    touchStartY =
-      touch.clientY;
-
-    touchCurrentX =
-      touch.clientX;
-  },
-  {
-    passive: true
+    activateScene(
+      currentIndex,
+      true
+    );
   }
-);
 
 
-experience.addEventListener(
-  "touchmove",
-  event => {
+  experience.addEventListener(
+    "pointerdown",
+    handlePointerDown
+  );
 
-    if (!event.touches.length) {
-      return;
-    }
+  experience.addEventListener(
+    "pointermove",
+    handlePointerMove
+  );
 
-    const touch =
-      event.touches[0];
+  experience.addEventListener(
+    "pointerup",
+    handlePointerUp
+  );
 
-    touchCurrentX =
-      touch.clientX;
-
-    const distanceY =
-      Math.abs(
-        touch.clientY -
-        touchStartY
-      );
-
-    const distanceX =
-      Math.abs(
-        touchCurrentX -
-        touchStartX
-      );
-
-    if (distanceX > distanceY) {
-      event.preventDefault();
-    }
-  },
-  {
-    passive: false
-  }
-);
+  experience.addEventListener(
+    "pointercancel",
+    handlePointerUp
+  );
 
 
-experience.addEventListener(
-  "touchend",
-  () => {
+  /* =====================================================
+     KEYBOARD
+  ===================================================== */
 
-    const distance =
-      touchCurrentX -
-      touchStartX;
+  window.addEventListener(
+    "keydown",
+    (event) => {
 
-    if (
-      Math.abs(distance) >=
-      DRAG_THRESHOLD
-    ) {
-
-      if (distance < 0) {
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
         goTo(currentIndex + 1);
-      } else {
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
         goTo(currentIndex - 1);
       }
 
-    } else {
+      if (event.key === "Home") {
+        event.preventDefault();
+        goTo(0);
+      }
 
-      goTo(currentIndex, {
-        force: true
-      });
+      if (event.key === "End") {
+        event.preventDefault();
+        goTo(scenes.length - 1);
+      }
+
+      if (event.key === "Escape") {
+        closeMobileMenu();
+      }
+
     }
-  },
-  {
-    passive: true
-  }
-);
-
-
-/* =====================================================
-   KEYBOARD
-===================================================== */
-
-document.addEventListener(
-  "keydown",
-  event => {
-
-    if (
-      event.key === "ArrowRight" ||
-      event.key === "ArrowDown"
-    ) {
-
-      event.preventDefault();
-
-      goTo(currentIndex + 1);
-
-      return;
-    }
-
-    if (
-      event.key === "ArrowLeft" ||
-      event.key === "ArrowUp"
-    ) {
-
-      event.preventDefault();
-
-      goTo(currentIndex - 1);
-
-      return;
-    }
-
-    if (event.key === "Home") {
-
-      event.preventDefault();
-
-      goTo(0);
-
-      return;
-    }
-
-    if (event.key === "End") {
-
-      event.preventDefault();
-
-      goTo(TOTAL_SCENES - 1);
-
-      return;
-    }
-
-    if (event.key === "Escape") {
-
-      closeMobileMenu();
-    }
-  }
-);
-
-
-/* =====================================================
-   MOBILE MENU
-===================================================== */
-
-function openMobileMenu() {
-
-  if (!mobileMenu) {
-    return;
-  }
-
-  mobileMenu.classList.add("is-open");
-
-  menuButton.classList.add("is-open");
-
-  menuButton.setAttribute(
-    "aria-expanded",
-    "true"
   );
 
-  document.body.style.overflow =
-    "hidden";
-}
 
+  /* =====================================================
+     MOBILE MENU
+  ===================================================== */
 
-function closeMobileMenu() {
-
-  if (!mobileMenu) {
-    return;
+  function openMobileMenu() {
+    mobileMenu.classList.add("is-open");
+    menuButton.classList.add("is-open");
   }
 
-  mobileMenu.classList.remove(
-    "is-open"
-  );
-
-  menuButton.classList.remove(
-    "is-open"
-  );
-
-  menuButton.setAttribute(
-    "aria-expanded",
-    "false"
-  );
-
-  document.body.style.overflow =
-    "";
-}
-
-
-if (menuButton) {
+  function closeMobileMenu() {
+    mobileMenu.classList.remove("is-open");
+    menuButton.classList.remove("is-open");
+  }
 
   menuButton.addEventListener(
     "click",
@@ -1004,170 +588,438 @@ if (menuButton) {
           "is-open"
         )
       ) {
-
         closeMobileMenu();
-
       } else {
-
         openMobileMenu();
       }
+
     }
   );
-}
 
 
-mobileNavItems.forEach(item => {
+  mobileButtons.forEach((button) => {
 
-  item.addEventListener(
-    "click",
-    () => {
+    button.addEventListener(
+      "click",
+      () => {
 
-      const index =
-        Number(
-          item.dataset.go
-        );
+        const index =
+          parseInt(
+            button.dataset.go,
+            10
+          );
 
-      closeMobileMenu();
-
-      setTimeout(() => {
+        closeMobileMenu();
         goTo(index);
-      }, 120);
-    }
-  );
-});
+
+      }
+    );
+
+  });
 
 
-/* =====================================================
-   BRAND
-===================================================== */
+  /* =====================================================
+     RESIZE
+  ===================================================== */
 
-if (brand) {
+  let resizeTimer = null;
 
-  brand.addEventListener(
-    "click",
-    event => {
-
-      event.preventDefault();
-
-      closeMobileMenu();
-
-      goTo(0);
-    }
-  );
-}
-
-
-/* =====================================================
-   RESIZE
-===================================================== */
-
-let resizeTimer = null;
-
-window.addEventListener(
-  "resize",
-  () => {
+  function handleResize() {
 
     clearTimeout(resizeTimer);
 
-    resizeTimer =
-      setTimeout(() => {
+    resizeTimer = setTimeout(() => {
 
-        track.style.transform =
-          `translate3d(-${currentIndex * 100}vw, 0, 0)`;
+      applyTranslate(
+        getTargetTranslate(currentIndex),
+        false
+      );
 
-        updateControlNetworkLines();
+      updateNetworkGeometry();
 
-      }, 120);
-  }
-);
+    }, 100);
 
-
-/* =====================================================
-   VISIBILITY
-===================================================== */
-
-document.addEventListener(
-  "visibilitychange",
-  () => {
-
-    if (!document.hidden) {
-
-      updateClock();
-
-      requestAnimationFrame(() => {
-        updateControlNetworkLines();
-      });
-    }
-  }
-);
-
-
-/* =====================================================
-   HASH NAVIGATION
-===================================================== */
-
-function readInitialHash() {
-
-  const hash =
-    window.location.hash;
-
-  if (!hash) {
-    return 0;
   }
 
-  const match =
-    hash.match(
-      /scene-(\d+)/
+  window.addEventListener(
+    "resize",
+    handleResize
+  );
+
+
+  /* =====================================================
+     CONTROL NETWORK GEOMETRY
+  ===================================================== */
+
+  const controlNetwork =
+    document.getElementById(
+      "controlNetwork"
     );
 
-  if (!match) {
-    return 0;
-  }
+  const centralControl =
+    document.getElementById(
+      "centralControl"
+    );
 
-  const number =
-    Number(match[1]);
+  const nodes = [
+    ...document.querySelectorAll(
+      ".network-node"
+    )
+  ];
 
-  if (
-    Number.isNaN(number) ||
-    number < 1 ||
-    number > TOTAL_SCENES
+  const lines = [
+    document.getElementById("line1"),
+    document.getElementById("line2"),
+    document.getElementById("line3"),
+    document.getElementById("line4")
+  ];
+
+  const signals = [
+    document.getElementById("signal1"),
+    document.getElementById("signal2"),
+    document.getElementById("signal3"),
+    document.getElementById("signal4")
+  ];
+
+
+  function getElementCenter(
+    element,
+    parentRect
   ) {
-    return 0;
+
+    const rect =
+      element.getBoundingClientRect();
+
+    return {
+      x:
+        ((rect.left + rect.width / 2) -
+          parentRect.left) /
+        parentRect.width *
+        1000,
+
+      y:
+        ((rect.top + rect.height / 2) -
+          parentRect.top) /
+        parentRect.height *
+        620
+    };
+
   }
 
-  return number - 1;
-}
 
+  function updateNetworkGeometry() {
 
-/* =====================================================
-   INITIAL STATE
-===================================================== */
+    if (
+      !controlNetwork ||
+      !centralControl ||
+      nodes.length !== 4
+    ) {
+      return;
+    }
 
-currentIndex =
-  readInitialHash();
+    const parentRect =
+      controlNetwork.getBoundingClientRect();
 
-track.style.transform =
-  `translate3d(-${currentIndex * 100}vw, 0, 0)`;
+    const center =
+      getElementCenter(
+        centralControl,
+        parentRect
+      );
 
-updateProgress();
+    nodes.forEach(
+      (node, index) => {
 
-setTimeout(() => {
+        const point =
+          getElementCenter(
+            node,
+            parentRect
+          );
 
-  updateControlNetworkLines();
+        const line = lines[index];
+        const signal = signals[index];
 
-}, 150);
+        if (!line || !signal) {
+          return;
+        }
 
+        line.setAttribute(
+          "x1",
+          point.x
+        );
 
-/* =====================================================
-   START
-===================================================== */
+        line.setAttribute(
+          "y1",
+          point.y
+        );
 
-window.addEventListener(
-  "load",
-  () => {
+        line.setAttribute(
+          "x2",
+          center.x
+        );
 
-    setTimeout(() => {
-      runLoader();
-    }, 350);
+        line.setAttribute(
+          "y2",
+          center.y
+        );
+
+        signal.setAttribute(
+          "cx",
+          point.x
+        );
+
+        signal.setAttribute(
+          "cy",
+          point.y
+        );
+
+      }
+    );
   }
-);
+
+
+  /* =====================================================
+     NETWORK ANIMATION
+  ===================================================== */
+
+  function startNetworkAnimation() {
+
+    stopNetworkAnimation();
+
+    updateNetworkGeometry();
+
+    let index = 0;
+
+    networkTimer =
+      setInterval(() => {
+
+        nodes.forEach(
+          (node) => {
+            node.classList.remove(
+              "is-live"
+            );
+          }
+        );
+
+        signals.forEach(
+          (signal) => {
+            signal.style.opacity = "0";
+          }
+        );
+
+        const node =
+          nodes[index];
+
+        const signal =
+          signals[index];
+
+        const line =
+          lines[index];
+
+        if (node) {
+          node.classList.add(
+            "is-live"
+          );
+        }
+
+        if (signal) {
+          signal.style.opacity = "1";
+        }
+
+        if (line) {
+          line.style.stroke =
+            "rgba(199,168,106,.85)";
+
+          line.style.strokeWidth = "1.8";
+
+          setTimeout(() => {
+
+            line.style.stroke =
+              "rgba(199,168,106,.25)";
+
+            line.style.strokeWidth = "1";
+
+          }, 650);
+
+        }
+
+        index =
+          (index + 1) % nodes.length;
+
+      }, 900);
+  }
+
+
+  function stopNetworkAnimation() {
+
+    if (networkTimer) {
+      clearInterval(networkTimer);
+      networkTimer = null;
+    }
+
+    nodes.forEach(
+      (node) => {
+        node.classList.remove(
+          "is-live"
+        );
+      }
+    );
+
+    signals.forEach(
+      (signal) => {
+        signal.style.opacity = "0";
+      }
+    );
+
+    lines.forEach(
+      (line) => {
+
+        if (!line) {
+          return;
+        }
+
+        line.style.stroke =
+          "rgba(199,168,106,.25)";
+
+        line.style.strokeWidth = "1";
+      }
+    );
+  }
+
+
+  /* =====================================================
+     IMAGE PARALLAX
+  ===================================================== */
+
+  function handleParallax(event) {
+
+    if (
+      window.innerWidth <= 760 ||
+      isDragging
+    ) {
+      return;
+    }
+
+    const activeScene =
+      scenes[currentIndex];
+
+    if (!activeScene) {
+      return;
+    }
+
+    const frame =
+      activeScene.querySelector(
+        ".media-frame"
+      );
+
+    const image =
+      activeScene.querySelector(
+        ".media-frame img"
+      );
+
+    if (!frame || !image) {
+      return;
+    }
+
+    const rect =
+      frame.getBoundingClientRect();
+
+    if (
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+    ) {
+      return;
+    }
+
+    const x =
+      (event.clientX - rect.left) /
+      rect.width -
+      .5;
+
+    const y =
+      (event.clientY - rect.top) /
+      rect.height -
+      .5;
+
+    image.style.transform =
+      `scale(1.025) translate(${x * -8}px, ${y * -5}px)`;
+  }
+
+  experience.addEventListener(
+    "pointermove",
+    handleParallax
+  );
+
+
+  /* =====================================================
+     PREVENT NATIVE GESTURES
+  ===================================================== */
+
+  document.addEventListener(
+    "gesturestart",
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    "gesturechange",
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    "gestureend",
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+
+  /* =====================================================
+     INIT
+  ===================================================== */
+
+  site.style.visibility = "visible";
+
+  const initialScene =
+    readHash();
+
+  scenes.forEach(
+    (scene, index) => {
+      scene.classList.toggle(
+        "is-active",
+        index === initialScene
+      );
+    }
+  );
+
+  applyTranslate(
+    getTargetTranslate(initialScene),
+    false
+  );
+
+  progressCurrent.textContent =
+    formatScene(initialScene);
+
+  progressFill.style.width =
+    `${((initialScene + 1) / scenes.length) * 100}%`;
+
+  updateNetworkGeometry();
+
+  setTimeout(() => {
+    updateNetworkGeometry();
+  }, 100);
+
+  setTimeout(() => {
+    updateNetworkGeometry();
+  }, 700);
+
+  startLoader();
+
+})();
