@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#070707">
   <title>SENTRA — объект под контролем</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -86,6 +88,7 @@
     </a>
 
     <div class="header-right">
+
       <div class="header-status">
         <span class="status-dot"></span>
         СИСТЕМА АКТИВНА
@@ -93,10 +96,15 @@
 
       <div class="header-time" id="clock">00:00:00</div>
 
-      <button class="menu-button" id="menuButton" aria-label="Открыть навигацию">
+      <button
+        class="menu-button"
+        id="menuButton"
+        aria-label="Открыть навигацию"
+      >
         <span></span>
         <span></span>
       </button>
+
     </div>
 
   </header>
@@ -108,7 +116,11 @@
     <div class="menu-head">
       <span>NAVIGATION</span>
 
-      <button class="menu-close" id="menuClose" aria-label="Закрыть навигацию">
+      <button
+        class="menu-close"
+        id="menuClose"
+        aria-label="Закрыть навигацию"
+      >
         ×
       </button>
     </div>
@@ -201,10 +213,6 @@
 
         <div class="scan-object"></div>
 
-        <div class="object-zone zone-1"></div>
-        <div class="object-zone zone-2"></div>
-        <div class="object-zone zone-3"></div>
-
         <div class="media-status">
           <span>OBJECT</span>
           <b>ONLINE</b>
@@ -241,13 +249,27 @@
 
         <img src="IMG_8745.png" alt="Система видеонаблюдения">
 
+        <div class="camera-grid">
+          <span class="grid-line grid-h-1"></span>
+          <span class="grid-line grid-h-2"></span>
+          <span class="grid-line grid-h-3"></span>
+          <span class="grid-line grid-v-1"></span>
+          <span class="grid-line grid-v-2"></span>
+          <span class="grid-line grid-v-3"></span>
+        </div>
+
+        <div class="camera-focus">
+          <span class="focus-corner focus-tl"></span>
+          <span class="focus-corner focus-tr"></span>
+          <span class="focus-corner focus-bl"></span>
+          <span class="focus-corner focus-br"></span>
+        </div>
+
         <div class="camera-scan"></div>
 
-        <div class="scan-point point-a"></div>
-        <div class="scan-point point-b"></div>
-        <div class="scan-point point-c"></div>
-
-        <div class="scan-complete">SCAN COMPLETE</div>
+        <div class="scan-complete">
+          SCAN ACTIVE
+        </div>
 
       </div>
 
@@ -271,7 +293,7 @@
 
         <div class="scene-meta">
           <span>MOTION</span>
-          <strong id="detectionState">ANALYZING</strong>
+          <strong id="detectionState">OBJECT DETECTED</strong>
         </div>
 
       </div>
@@ -280,18 +302,25 @@
 
         <img src="IMG_8746.png" alt="Изменение обнаружено">
 
-        <div class="person-target">
-          <span class="target-corner tl"></span>
-          <span class="target-corner tr"></span>
-          <span class="target-corner bl"></span>
-          <span class="target-corner br"></span>
+        <div class="detection-grid">
+          <span class="grid-line grid-h-1"></span>
+          <span class="grid-line grid-h-2"></span>
+          <span class="grid-line grid-h-3"></span>
+          <span class="grid-line grid-v-1"></span>
+          <span class="grid-line grid-v-2"></span>
+          <span class="grid-line grid-v-3"></span>
         </div>
 
-        <div class="person-scan"></div>
+        <div class="detection-focus">
+          <span class="focus-corner focus-tl"></span>
+          <span class="focus-corner focus-tr"></span>
+          <span class="focus-corner focus-bl"></span>
+          <span class="focus-corner focus-br"></span>
+        </div>
 
         <div class="detection-label">
           <span>MOTION</span>
-          <b>DETECTED</b>
+          <b>OBJECT DETECTED</b>
         </div>
 
       </div>
@@ -358,8 +387,8 @@
         </p>
 
         <div class="scene-meta">
-          <span>FIRE SAFETY</span>
-          <strong>THREAT DETECTED</strong>
+          <span>THREAT MONITOR</span>
+          <strong id="threatState">ALERT ACTIVE</strong>
         </div>
 
       </div>
@@ -368,12 +397,30 @@
 
         <img src="IMG_8752.png" alt="Система пожарной безопасности">
 
-        <div class="threat-frame"></div>
+        <div class="threat-signal">
 
-        <div class="threat-pulse"></div>
+          <div class="threat-alert alert-fire">
+            <span>01</span>
+            <strong>ПОЖАР</strong>
+            <small>FIRE DETECTED</small>
+          </div>
+
+          <div class="threat-alert alert-intrusion">
+            <span>02</span>
+            <strong>ПРОНИКНОВЕНИЕ</strong>
+            <small>INTRUSION DETECTED</small>
+          </div>
+
+          <div class="threat-alert alert-alarm">
+            <span>03</span>
+            <strong>ТРЕВОГА</strong>
+            <small>ALARM DETECTED</small>
+          </div>
+
+        </div>
 
         <div class="threat-label">
-          <span>FIRE SYSTEM</span>
+          <span>SECURITY EVENT</span>
           <strong>THREAT DETECTED</strong>
         </div>
 
@@ -474,6 +521,15 @@
 
         <div class="network-overlay"></div>
 
+        <div class="network-center">
+
+          <span>SENTRA</span>
+          <b>CONTROL CENTER</b>
+
+          <i class="center-pulse"></i>
+
+        </div>
+
         <div class="network-node node-cctv">
           <span>CCTV</span>
           <i></i>
@@ -494,16 +550,42 @@
           <i></i>
         </div>
 
-        <div class="network-center">
-          <span>SENTRA</span>
-          <b>CONTROL CENTER</b>
-        </div>
+        <svg
+          class="network-lines"
+          viewBox="0 0 1000 625"
+          preserveAspectRatio="none"
+        >
+          <line
+            class="network-line line-cctv"
+            x1="16%"
+            y1="15%"
+            x2="50%"
+            y2="50%"
+          />
 
-        <svg class="network-lines" viewBox="0 0 1000 625" preserveAspectRatio="none">
-          <line class="network-line line-cctv" x1="16%" y1="15%" x2="50%" y2="50%"/>
-          <line class="network-line line-fire" x1="84%" y1="15%" x2="50%" y2="50%"/>
-          <line class="network-line line-access" x1="16%" y1="85%" x2="50%" y2="50%"/>
-          <line class="network-line line-service" x1="84%" y1="85%" x2="50%" y2="50%"/>
+          <line
+            class="network-line line-fire"
+            x1="84%"
+            y1="15%"
+            x2="50%"
+            y2="50%"
+          />
+
+          <line
+            class="network-line line-access"
+            x1="16%"
+            y1="85%"
+            x2="50%"
+            y2="50%"
+          />
+
+          <line
+            class="network-line line-service"
+            x1="84%"
+            y1="85%"
+            x2="50%"
+            y2="50%"
+          />
         </svg>
 
         <div class="network-signal signal-cctv"></div>
@@ -511,7 +593,9 @@
         <div class="network-signal signal-access"></div>
         <div class="network-signal signal-service"></div>
 
-        <div class="network-complete">ALL SYSTEMS ONLINE</div>
+        <div class="network-complete">
+          ALL SYSTEMS ONLINE
+        </div>
 
       </div>
 
