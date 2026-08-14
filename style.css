@@ -2051,6 +2051,11 @@ a {
     height: 50px;
   }
 
+  .scene-access .scene-media > img {
+    object-fit: contain;
+    object-position: center center;
+  }
+
 
   /* 5 */
 
